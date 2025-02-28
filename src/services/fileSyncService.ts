@@ -1,5 +1,19 @@
-
 import { toast } from "sonner";
+
+// Define and export the types needed by components
+export interface SyncConfig {
+  sourceFolder: string;
+  destinationFolder: string;
+  pollingInterval: number;
+  enabled: boolean;
+}
+
+export interface SyncStatus {
+  state: 'idle' | 'polling' | 'syncing' | 'success' | 'error';
+  message?: string;
+  lastSync?: string;
+  error?: string;
+}
 
 class FileSyncService {
   timerId: number | null = null;
@@ -44,7 +58,7 @@ class FileSyncService {
   }
 
   // Start the polling process
-  startPolling(config, onStatusChange) {
+  startPolling(config: SyncConfig, onStatusChange: (status: SyncStatus) => void) {
     if (this.timerId) {
       this.stopPolling();
     }
@@ -96,7 +110,7 @@ class FileSyncService {
   }
 
   // Read files from a directory
-  async readFiles(directory) {
+  async readFiles(directory: string): Promise<string[]> {
     try {
       if (this.isTauri && this.tauriFs) {
         try {
@@ -132,7 +146,7 @@ class FileSyncService {
   }
 
   // Mock implementation for web development
-  getMockFiles(directory) {
+  getMockFiles(directory: string) {
     console.log('Using mock readFiles in web environment');
     // Simulate 1-5 random files
     const fileCount = Math.floor(Math.random() * 5) + 1;
@@ -144,7 +158,7 @@ class FileSyncService {
   }
 
   // Sync a single file from source to destination
-  async syncFile(sourcePath, destinationFolder) {
+  async syncFile(sourcePath: string, destinationFolder: string): Promise<void> {
     try {
       if (this.isTauri && this.tauriFs && this.tauriPath) {
         try {
@@ -175,7 +189,7 @@ class FileSyncService {
   }
 
   // Mock file sync for web development
-  mockSyncFile(sourcePath, destinationFolder) {
+  mockSyncFile(sourcePath: string, destinationFolder: string) {
     // Mock for web environment
     console.log(`Mock: Synced ${sourcePath} to ${destinationFolder}`);
     this.syncedFiles.add(sourcePath);
@@ -187,7 +201,7 @@ class FileSyncService {
   }
 
   // Perform a single sync operation
-  async performSync(config, onStatusChange) {
+  async performSync(config: SyncConfig, onStatusChange: (status: SyncStatus) => void): Promise<void> {
     // First update status to polling
     onStatusChange({ state: 'polling' });
 
@@ -243,7 +257,7 @@ class FileSyncService {
   }
 
   // Manually trigger a sync
-  async manualSync(config, onStatusChange) {
+  async manualSync(config: SyncConfig, onStatusChange: (status: SyncStatus) => void): Promise<void> {
     // If a poll is already in progress, cancel it
     if (this.timerId) {
       this.stopPolling();
