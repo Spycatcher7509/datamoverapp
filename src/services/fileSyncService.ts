@@ -22,8 +22,6 @@ class FileSyncService {
   private timerId: number | null = null;
   private lastSyncTime: Date | null = null;
   private isTauri: boolean = false;
-  private tauriFs: any = null;
-  private tauriPath: any = null;
   private sourceFiles: string[] = [];
   private syncedFiles: Set<string> = new Set();
   
@@ -40,10 +38,7 @@ class FileSyncService {
                      window.__TAURI__ !== undefined;
       
       if (this.isTauri) {
-        // Dynamically import Tauri APIs
-        this.tauriFs = await import('@tauri-apps/api/fs');
-        this.tauriPath = await import('@tauri-apps/api/path');
-        console.log('Running in Tauri environment');
+        console.log('Running in Tauri environment, but using mock implementation since Tauri APIs are not available');
       } else {
         console.log('Running in web environment');
       }
@@ -108,41 +103,18 @@ class FileSyncService {
   // Read files from a directory
   private async readFiles(directory: string): Promise<string[]> {
     try {
-      if (this.isTauri && this.tauriFs) {
-        try {
-          const entries = await this.tauriFs.readDir(directory, { recursive: true });
-          const files: string[] = [];
-          
-          // Helper function to recursively get files
-          const processEntries = async (entries: any[]) => {
-            for (const entry of entries) {
-              if (entry.children) {
-                await processEntries(entry.children);
-              } else if (!entry.isDirectory) {
-                files.push(entry.path);
-              }
-            }
-          };
-          
-          await processEntries(entries);
-          return files;
-        } catch (e) {
-          console.error('Error reading directory with Tauri:', e);
-          throw e;
-        }
-      } else {
-        // Mock for web environment
-        console.log('Using mock readFiles in web environment');
-        // Simulate 1-5 random files
-        const fileCount = Math.floor(Math.random() * 5) + 1;
-        const mockFiles = [];
-        
-        for (let i = 0; i < fileCount; i++) {
-          mockFiles.push(`${directory}/file${i}.txt`);
-        }
-        
-        return mockFiles;
+      // Use mock implementation for now
+      console.log('Using mock readFiles for directory:', directory);
+      
+      // Simulate 1-5 random files
+      const fileCount = Math.floor(Math.random() * 5) + 1;
+      const mockFiles = [];
+      
+      for (let i = 0; i < fileCount; i++) {
+        mockFiles.push(`${directory}/file${i}.txt`);
       }
+      
+      return mockFiles;
     } catch (error) {
       console.error(`Error reading directory ${directory}:`, error);
       throw error;
@@ -152,35 +124,13 @@ class FileSyncService {
   // Sync a single file from source to destination
   private async syncFile(sourcePath: string, destinationFolder: string): Promise<void> {
     try {
-      if (this.isTauri && this.tauriFs && this.tauriPath) {
-        try {
-          // Get just the filename from the path
-          const fileName = await this.tauriPath.basename(sourcePath);
-          const destPath = await this.tauriPath.join(destinationFolder, fileName);
-          
-          // Ensure destination directory exists
-          await this.tauriFs.createDir(destinationFolder, { recursive: true });
-          
-          // Copy the file
-          await this.tauriFs.copyFile(sourcePath, destPath);
-          
-          console.log(`Copied ${sourcePath} to ${destPath}`);
-          
-          // Mark as synced
-          this.syncedFiles.add(sourcePath);
-        } catch (e) {
-          console.error('Error syncing file with Tauri:', e);
-          throw e;
-        }
-      } else {
-        // Mock for web environment
-        console.log(`Mock: Synced ${sourcePath} to ${destinationFolder}`);
-        this.syncedFiles.add(sourcePath);
-        
-        // Simulate a random success/fail
-        if (Math.random() > 0.9) {
-          throw new Error('Random mock sync error');
-        }
+      // Mock implementation
+      console.log(`Mock: Synced ${sourcePath} to ${destinationFolder}`);
+      this.syncedFiles.add(sourcePath);
+      
+      // Simulate a random success/fail
+      if (Math.random() > 0.9) {
+        throw new Error('Random mock sync error');
       }
     } catch (error) {
       console.error(`Error syncing file ${sourcePath}:`, error);
