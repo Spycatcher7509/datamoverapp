@@ -15,6 +15,21 @@ Before you can build this application, you'll need:
    ```
    xcode-select --install
    ```
+   
+   For macOS with Apple Silicon (M1/M2), ensure Rust is installed via Homebrew at:
+   ```
+   /opt/homebrew/bin/rustc
+   ```
+   
+   If it's not installed or not in this location, you can install/update it with:
+   ```
+   brew install rust
+   ```
+   
+   You can verify the path with:
+   ```
+   which rustc
+   ```
 
    **For Windows**:
    - Visual Studio C++ Build Tools
@@ -60,3 +75,16 @@ The application uses Tauri's native APIs for file system operations and dialogs 
 ## Distribution
 
 After building, you'll find the distributable files in the `src-tauri/target/release/bundle` directory, organized by platform.
+
+## Troubleshooting
+
+If you encounter issues with Rust compiler paths, particularly on macOS:
+
+1. Check your current Rust path:
+   ```
+   which rustc
+   ```
+
+2. If it doesn't match `/opt/homebrew/bin/rustc` (for Apple Silicon Macs), you may need to add it to your PATH or create a symlink.
+
+3. For Apple Silicon Macs, ensure Homebrew is properly installed in the `/opt/homebrew/` directory.

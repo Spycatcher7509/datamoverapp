@@ -1,0 +1,5 @@
+
+# Rust configuration for the project
+export RUSTC=/opt/homebrew/bin/rustc
+export CARGO=/opt/homebrew/bin/cargo
+export PATH="/opt/homebrew/bin:$PATH"
