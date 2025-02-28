@@ -26,13 +26,42 @@ const FileExplorer = ({
 }: FileExplorerProps) => {
   const [isFocused, setIsFocused] = useState(false);
 
-  // In a real app, this would call the appropriate Electron/Tauri APIs
-  // For this demo, we'll simulate folder selection
-  const handleBrowse = () => {
-    // Simulate a folder selection dialog
-    // In a real electron/tauri app, this would open a folder picker
-    const mockPath = `/Users/user/Documents/Sample${Math.floor(Math.random() * 100)}`;
-    onChange(mockPath);
+  // Try to use Tauri's native file dialogs when available
+  const handleBrowse = async () => {
+    try {
+      // Check if we're running in Tauri
+      const isTauri = typeof window !== 'undefined' && 
+                      window !== null && 
+                      // @ts-ignore - Tauri types
+                      window.__TAURI__ !== undefined;
+      
+      if (isTauri) {
+        // Dynamically import Tauri dialog API
+        const tauriDialog = await import('@tauri-apps/api/dialog');
+        
+        // Open a folder selection dialog
+        const selected = await tauriDialog.open({
+          directory: true,
+          multiple: false,
+          title: `Select ${label}`,
+        });
+        
+        // If a folder was selected (not cancelled), update the state
+        if (selected && !Array.isArray(selected)) {
+          onChange(selected as string);
+        }
+      } else {
+        // Fallback for web - simulate folder selection
+        console.log('Running in web mode - using mock folder selection');
+        const mockPath = `/Users/user/Documents/Sample${Math.floor(Math.random() * 100)}`;
+        onChange(mockPath);
+      }
+    } catch (error) {
+      console.error('Error selecting folder:', error);
+      // Fallback for errors
+      const mockPath = `/Users/user/Documents/Sample${Math.floor(Math.random() * 100)}`;
+      onChange(mockPath);
+    }
   };
 
   const handleClear = () => {

@@ -18,64 +18,38 @@ export interface SyncConfig {
   enabled: boolean;
 }
 
-export interface FileInfo {
-  id: string;
-  name: string;
-  size: number; // in KB
-  lastModified: Date;
-  synced: boolean;
-}
-
 class FileSyncService {
   private timerId: number | null = null;
-  private mockFiles: FileInfo[] = [];
-  private syncedFileCount: number = 0;
   private lastSyncTime: Date | null = null;
+  private isTauri: boolean = false;
+  private tauriFs: any = null;
+  private tauriPath: any = null;
+  private sourceFiles: string[] = [];
+  private syncedFiles: Set<string> = new Set();
   
   constructor() {
-    // Initialize with random files between 5-20
-    const fileCount = Math.floor(Math.random() * 15) + 5;
-    this.generateMockFiles(fileCount);
+    // Check if we're running in Tauri on initialization
+    this.initializeEnvironment();
   }
-
-  // Generate mock files for simulation
-  private generateMockFiles(count: number): void {
-    const fileExtensions = ['.pdf', '.docx', '.jpg', '.png', '.txt', '.xlsx'];
-    const fileNames = [
-      'Report', 'Document', 'Photo', 'Invoice', 'Receipt', 'Presentation', 
-      'Contract', 'Template', 'Screenshot', 'Backup', 'Chart', 'Diagram'
-    ];
-    
-    for (let i = 0; i < count; i++) {
-      const randomName = fileNames[Math.floor(Math.random() * fileNames.length)];
-      const randomExt = fileExtensions[Math.floor(Math.random() * fileExtensions.length)];
-      const randomSize = Math.floor(Math.random() * 5000) + 10; // 10KB to 5MB
-      const randomDate = new Date();
-      randomDate.setDate(randomDate.getDate() - Math.floor(Math.random() * 30)); // Last 30 days
+  
+  private async initializeEnvironment() {
+    try {
+      this.isTauri = typeof window !== 'undefined' && 
+                     window !== null && 
+                     // @ts-ignore - Tauri types
+                     window.__TAURI__ !== undefined;
       
-      this.mockFiles.push({
-        id: `file-${Date.now()}-${i}`,
-        name: `${randomName}${i}${randomExt}`,
-        size: randomSize,
-        lastModified: randomDate,
-        synced: Math.random() > 0.7 // 30% are not synced initially
-      });
-    }
-  }
-
-  // Get files that need to be synced (not synced yet)
-  private getUnsyncedFiles(): FileInfo[] {
-    return this.mockFiles.filter(file => !file.synced);
-  }
-
-  // Add new files (simulates new files being created in source)
-  private addNewFiles(count: number = 1): void {
-    const prevLength = this.mockFiles.length;
-    this.generateMockFiles(count);
-    // Mark new files as unsynced
-    for (let i = prevLength; i < this.mockFiles.length; i++) {
-      this.mockFiles[i].synced = false;
-      this.mockFiles[i].lastModified = new Date(); // Just created
+      if (this.isTauri) {
+        // Dynamically import Tauri APIs
+        this.tauriFs = await import('@tauri-apps/api/fs');
+        this.tauriPath = await import('@tauri-apps/api/path');
+        console.log('Running in Tauri environment');
+      } else {
+        console.log('Running in web environment');
+      }
+    } catch (error) {
+      console.error('Error initializing environment:', error);
+      this.isTauri = false;
     }
   }
 
@@ -94,20 +68,17 @@ class FileSyncService {
     if (!config.sourceFolder || !config.destinationFolder) {
       onStatusChange({ 
         state: 'error', 
-        message: 'Source and destination folders must be specified',
-        error: 'Invalid configuration'
+        error: 'Source and destination folders must be specified'
       });
       return;
     }
-
+    
     // Make sure source and destination are different
     if (config.sourceFolder === config.destinationFolder) {
       onStatusChange({
         state: 'error',
-        message: 'Source and destination cannot be the same',
-        error: 'Invalid configuration'
+        error: 'Source and destination folders must be different'
       });
-      toast.error('Source and destination folders must be different');
       return;
     }
     
@@ -122,12 +93,6 @@ class FileSyncService {
     
     // Set up polling interval
     this.timerId = window.setInterval(() => {
-      // Randomly add new files (10% chance per interval)
-      if (Math.random() < 0.1) {
-        const numNewFiles = Math.floor(Math.random() * 3) + 1; // 1-3 new files
-        this.addNewFiles(numNewFiles);
-      }
-      
       this.performSync(config, onStatusChange);
     }, intervalMs);
   }
@@ -140,70 +105,124 @@ class FileSyncService {
     }
   }
   
+  // Read files from a directory
+  private async readFiles(directory: string): Promise<string[]> {
+    try {
+      if (this.isTauri && this.tauriFs) {
+        try {
+          const entries = await this.tauriFs.readDir(directory, { recursive: true });
+          const files: string[] = [];
+          
+          // Helper function to recursively get files
+          const processEntries = async (entries: any[]) => {
+            for (const entry of entries) {
+              if (entry.children) {
+                await processEntries(entry.children);
+              } else if (!entry.isDirectory) {
+                files.push(entry.path);
+              }
+            }
+          };
+          
+          await processEntries(entries);
+          return files;
+        } catch (e) {
+          console.error('Error reading directory with Tauri:', e);
+          throw e;
+        }
+      } else {
+        // Mock for web environment
+        console.log('Using mock readFiles in web environment');
+        // Simulate 1-5 random files
+        const fileCount = Math.floor(Math.random() * 5) + 1;
+        const mockFiles = [];
+        
+        for (let i = 0; i < fileCount; i++) {
+          mockFiles.push(`${directory}/file${i}.txt`);
+        }
+        
+        return mockFiles;
+      }
+    } catch (error) {
+      console.error(`Error reading directory ${directory}:`, error);
+      throw error;
+    }
+  }
+  
+  // Sync a single file from source to destination
+  private async syncFile(sourcePath: string, destinationFolder: string): Promise<void> {
+    try {
+      if (this.isTauri && this.tauriFs && this.tauriPath) {
+        try {
+          // Get just the filename from the path
+          const fileName = await this.tauriPath.basename(sourcePath);
+          const destPath = await this.tauriPath.join(destinationFolder, fileName);
+          
+          // Ensure destination directory exists
+          await this.tauriFs.createDir(destinationFolder, { recursive: true });
+          
+          // Copy the file
+          await this.tauriFs.copyFile(sourcePath, destPath);
+          
+          console.log(`Copied ${sourcePath} to ${destPath}`);
+          
+          // Mark as synced
+          this.syncedFiles.add(sourcePath);
+        } catch (e) {
+          console.error('Error syncing file with Tauri:', e);
+          throw e;
+        }
+      } else {
+        // Mock for web environment
+        console.log(`Mock: Synced ${sourcePath} to ${destinationFolder}`);
+        this.syncedFiles.add(sourcePath);
+        
+        // Simulate a random success/fail
+        if (Math.random() > 0.9) {
+          throw new Error('Random mock sync error');
+        }
+      }
+    } catch (error) {
+      console.error(`Error syncing file ${sourcePath}:`, error);
+      throw error;
+    }
+  }
+  
   // Perform a single sync operation
   private async performSync(config: SyncConfig, onStatusChange: (status: SyncStatus) => void): Promise<void> {
     // First update status to polling
     onStatusChange({ state: 'polling' });
     
     try {
-      // Simulate API/file system delay (checking for changes)
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Get files from source directory
+      this.sourceFiles = await this.readFiles(config.sourceFolder);
       
-      // Random chance (5% chance) to simulate an error
-      if (Math.random() < 0.05) {
-        const possibleErrors = [
-          "Permission denied accessing folder",
-          "Network drive disconnected",
-          "Destination folder full",
-          "Source file locked by another process",
-          "Unexpected I/O error"
-        ];
-        const errorMessage = possibleErrors[Math.floor(Math.random() * possibleErrors.length)];
-        throw new Error(errorMessage);
-      }
-      
-      // Get files that need to be synced
-      const filesToSync = this.getUnsyncedFiles();
+      // Find files that need to be synced (not in syncedFiles)
+      const filesToSync = this.sourceFiles.filter(file => !this.syncedFiles.has(file));
       
       if (filesToSync.length > 0) {
         // Update status to syncing
         onStatusChange({ state: 'syncing' });
         
-        // Simulate sync operation with progress for larger files
-        const totalSizeKB = filesToSync.reduce((sum, file) => sum + file.size, 0);
-        const estimatedTimeMs = Math.min(3000, totalSizeKB / 5); // Simulate faster sync for demo
+        // Sync each file
+        for (const file of filesToSync) {
+          await this.syncFile(file, config.destinationFolder);
+        }
         
-        await new Promise(resolve => setTimeout(resolve, estimatedTimeMs));
-        
-        // Mark files as synced
-        filesToSync.forEach(file => {
-          file.synced = true;
-        });
-        
-        this.syncedFileCount += filesToSync.length;
         this.lastSyncTime = new Date();
         
         // Format current time
         const timeString = this.lastSyncTime.toLocaleTimeString();
         
-        // Calculate total size of synced files in appropriate units
-        let sizeText = "";
-        const totalSizeMB = totalSizeKB / 1024;
-        if (totalSizeMB >= 1) {
-          sizeText = `${totalSizeMB.toFixed(2)} MB`;
-        } else {
-          sizeText = `${totalSizeKB.toFixed(2)} KB`;
-        }
-        
         // Update status to success
         onStatusChange({ 
           state: 'success', 
-          message: `Synced ${filesToSync.length} files (${sizeText})`,
+          message: `Synced ${filesToSync.length} files`,
           lastSync: timeString
         });
         
         // Show toast notification
-        toast.success(`Synced ${filesToSync.length} files (${sizeText}) to destination`);
+        toast.success(`Synced ${filesToSync.length} files to destination`);
       } else {
         // No changes found, update status to idle
         onStatusChange({ 
@@ -213,33 +232,17 @@ class FileSyncService {
       }
     } catch (error) {
       // Handle errors
+      console.error('Sync error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       
       onStatusChange({ 
         state: 'error',
-        message: 'Sync failed',
         error: errorMessage
       });
       
       // Show error toast
       toast.error(`Sync error: ${errorMessage}`);
     }
-  }
-  
-  // Get stats
-  getStats() {
-    return {
-      totalFiles: this.mockFiles.length,
-      syncedFiles: this.syncedFileCount,
-      lastSyncTime: this.lastSyncTime ? this.lastSyncTime.toLocaleTimeString() : 'Never',
-      sourceSize: this.mockFiles.reduce((sum, file) => sum + file.size, 0),
-      unsyncedCount: this.getUnsyncedFiles().length
-    };
-  }
-  
-  // Get all files (could be used for a detailed view in the UI)
-  getFiles(): FileInfo[] {
-    return [...this.mockFiles];
   }
   
   // Manually trigger a sync
