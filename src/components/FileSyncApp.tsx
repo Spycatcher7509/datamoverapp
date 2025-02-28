@@ -1,10 +1,9 @@
 
 import { useEffect, useState } from 'react';
 import { Separator } from "@/components/ui/separator";
-import { FolderSyncIcon } from 'lucide-react';
 import { toast } from "sonner";
 import AppCard from './AppCard';
-import SyncStatus from './SyncStatus';
+import SyncHeader from './SyncHeader';
 import SyncControls from './SyncControls';
 import SyncErrorMessage from './SyncErrorMessage';
 import FolderConfigForm from './FolderConfigForm';
@@ -137,20 +136,7 @@ const FileSyncApp = () => {
 
   return (
     <AppCard>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-            <FolderSyncIcon className="h-4 w-4 text-primary" />
-          </div>
-          <h1 className="text-xl font-semibold tracking-tight">File Sync</h1>
-        </div>
-        
-        <SyncStatus 
-          state={syncStatus.state} 
-          message={syncStatus.message}
-          lastSync={syncStatus.lastSync} 
-        />
-      </div>
+      <SyncHeader syncStatus={syncStatus} />
       
       <Separator className="my-4" />
       
