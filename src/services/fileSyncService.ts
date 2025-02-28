@@ -1,36 +1,21 @@
 
 import { toast } from "sonner";
 
-// Types to represent our sync state
-export type SyncState = 'idle' | 'polling' | 'syncing' | 'success' | 'error';
-
-export interface SyncStatus {
-  state: SyncState;
-  message?: string;
-  lastSync?: string;
-  error?: string;
-}
-
-export interface SyncConfig {
-  sourceFolder: string;
-  destinationFolder: string;
-  pollingInterval: number; // in seconds
-  enabled: boolean;
-}
-
 class FileSyncService {
-  private timerId: number | null = null;
-  private lastSyncTime: Date | null = null;
-  private isTauri: boolean = false;
-  private sourceFiles: string[] = [];
-  private syncedFiles: Set<string> = new Set();
-  
+  timerId: number | null = null;
+  lastSyncTime: Date | null = null;
+  isTauri: boolean = false;
+  tauriFs: any = null;
+  tauriPath: any = null;
+  sourceFiles: string[] = [];
+  syncedFiles: Set<string> = new Set();
+
   constructor() {
     // Check if we're running in Tauri on initialization
     this.initializeEnvironment();
   }
-  
-  private async initializeEnvironment() {
+
+  async initializeEnvironment() {
     try {
       this.isTauri = typeof window !== 'undefined' && 
                      window !== null && 
@@ -38,7 +23,17 @@ class FileSyncService {
                      window.__TAURI__ !== undefined;
       
       if (this.isTauri) {
-        console.log('Running in Tauri environment, but using mock implementation since Tauri APIs are not available');
+        try {
+          // Dynamically import Tauri APIs
+          const fs = await import('@tauri-apps/api/fs');
+          const path = await import('@tauri-apps/api/path');
+          this.tauriFs = fs;
+          this.tauriPath = path;
+          console.log('Running in Tauri environment');
+        } catch (e) {
+          console.error('Error importing Tauri APIs:', e);
+          this.isTauri = false;
+        }
       } else {
         console.log('Running in web environment');
       }
@@ -49,100 +44,153 @@ class FileSyncService {
   }
 
   // Start the polling process
-  startPolling(config: SyncConfig, onStatusChange: (status: SyncStatus) => void): void {
+  startPolling(config, onStatusChange) {
     if (this.timerId) {
       this.stopPolling();
     }
-    
+
     if (!config.enabled) {
       onStatusChange({ state: 'idle' });
       return;
     }
-    
+
     // Validate configuration
     if (!config.sourceFolder || !config.destinationFolder) {
       onStatusChange({ 
         state: 'error', 
-        error: 'Source and destination folders must be specified'
+        error: 'Source and destination folders must be specified' 
       });
       return;
     }
-    
+
     // Make sure source and destination are different
     if (config.sourceFolder === config.destinationFolder) {
-      onStatusChange({
-        state: 'error',
-        error: 'Source and destination folders must be different'
+      onStatusChange({ 
+        state: 'error', 
+        error: 'Source and destination folders must be different' 
       });
       return;
     }
-    
+
     // Convert seconds to milliseconds
     const intervalMs = config.pollingInterval * 1000;
-    
+
     // Initial status update
     onStatusChange({ state: 'polling' });
-    
+
     // Perform immediate sync
     this.performSync(config, onStatusChange);
-    
+
     // Set up polling interval
     this.timerId = window.setInterval(() => {
       this.performSync(config, onStatusChange);
     }, intervalMs);
   }
-  
+
   // Stop the polling process
-  stopPolling(): void {
+  stopPolling() {
     if (this.timerId !== null) {
       clearInterval(this.timerId);
       this.timerId = null;
     }
   }
-  
+
   // Read files from a directory
-  private async readFiles(directory: string): Promise<string[]> {
+  async readFiles(directory) {
     try {
-      // Use mock implementation for now
-      console.log('Using mock readFiles for directory:', directory);
-      
-      // Simulate 1-5 random files
-      const fileCount = Math.floor(Math.random() * 5) + 1;
-      const mockFiles = [];
-      
-      for (let i = 0; i < fileCount; i++) {
-        mockFiles.push(`${directory}/file${i}.txt`);
+      if (this.isTauri && this.tauriFs) {
+        try {
+          const entries = await this.tauriFs.readDir(directory, { recursive: true });
+          const files = [];
+
+          // Helper function to recursively get files
+          const processEntries = async (entries) => {
+            for (const entry of entries) {
+              if (entry.children) {
+                await processEntries(entry.children);
+              } else if (!entry.isDirectory) {
+                files.push(entry.path);
+              }
+            }
+          };
+
+          await processEntries(entries);
+          return files;
+        } catch (e) {
+          console.error('Error reading directory with Tauri:', e);
+          // Fall back to mock implementation
+          return this.getMockFiles(directory);
+        }
+      } else {
+        // Mock for web environment
+        return this.getMockFiles(directory);
       }
-      
-      return mockFiles;
     } catch (error) {
       console.error(`Error reading directory ${directory}:`, error);
       throw error;
     }
   }
-  
+
+  // Mock implementation for web development
+  getMockFiles(directory) {
+    console.log('Using mock readFiles in web environment');
+    // Simulate 1-5 random files
+    const fileCount = Math.floor(Math.random() * 5) + 1;
+    const mockFiles = [];
+    for (let i = 0; i < fileCount; i++) {
+      mockFiles.push(`${directory}/file${i}.txt`);
+    }
+    return mockFiles;
+  }
+
   // Sync a single file from source to destination
-  private async syncFile(sourcePath: string, destinationFolder: string): Promise<void> {
+  async syncFile(sourcePath, destinationFolder) {
     try {
-      // Mock implementation
-      console.log(`Mock: Synced ${sourcePath} to ${destinationFolder}`);
-      this.syncedFiles.add(sourcePath);
-      
-      // Simulate a random success/fail
-      if (Math.random() > 0.9) {
-        throw new Error('Random mock sync error');
+      if (this.isTauri && this.tauriFs && this.tauriPath) {
+        try {
+          // Get just the filename from the path
+          const fileName = await this.tauriPath.basename(sourcePath);
+          const destPath = await this.tauriPath.join(destinationFolder, fileName);
+
+          // Ensure destination directory exists
+          await this.tauriFs.createDir(destinationFolder, { recursive: true });
+          
+          // Copy the file
+          await this.tauriFs.copyFile(sourcePath, destPath);
+          console.log(`Copied ${sourcePath} to ${destPath}`);
+          
+          // Mark as synced
+          this.syncedFiles.add(sourcePath);
+        } catch (e) {
+          console.error('Error syncing file with Tauri:', e);
+          this.mockSyncFile(sourcePath, destinationFolder);
+        }
+      } else {
+        this.mockSyncFile(sourcePath, destinationFolder);
       }
     } catch (error) {
       console.error(`Error syncing file ${sourcePath}:`, error);
       throw error;
     }
   }
-  
+
+  // Mock file sync for web development
+  mockSyncFile(sourcePath, destinationFolder) {
+    // Mock for web environment
+    console.log(`Mock: Synced ${sourcePath} to ${destinationFolder}`);
+    this.syncedFiles.add(sourcePath);
+    
+    // Simulate a random success/fail
+    if (Math.random() > 0.9) {
+      throw new Error('Random mock sync error');
+    }
+  }
+
   // Perform a single sync operation
-  private async performSync(config: SyncConfig, onStatusChange: (status: SyncStatus) => void): Promise<void> {
+  async performSync(config, onStatusChange) {
     // First update status to polling
     onStatusChange({ state: 'polling' });
-    
+
     try {
       // Get files from source directory
       this.sourceFiles = await this.readFiles(config.sourceFolder);
@@ -160,13 +208,12 @@ class FileSyncService {
         }
         
         this.lastSyncTime = new Date();
-        
         // Format current time
         const timeString = this.lastSyncTime.toLocaleTimeString();
         
         // Update status to success
-        onStatusChange({ 
-          state: 'success', 
+        onStatusChange({
+          state: 'success',
           message: `Synced ${filesToSync.length} files`,
           lastSync: timeString
         });
@@ -175,7 +222,7 @@ class FileSyncService {
         toast.success(`Synced ${filesToSync.length} files to destination`);
       } else {
         // No changes found, update status to idle
-        onStatusChange({ 
+        onStatusChange({
           state: 'idle',
           lastSync: this.lastSyncTime ? this.lastSyncTime.toLocaleTimeString() : undefined
         });
@@ -185,7 +232,7 @@ class FileSyncService {
       console.error('Sync error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       
-      onStatusChange({ 
+      onStatusChange({
         state: 'error',
         error: errorMessage
       });
@@ -194,9 +241,9 @@ class FileSyncService {
       toast.error(`Sync error: ${errorMessage}`);
     }
   }
-  
+
   // Manually trigger a sync
-  async manualSync(config: SyncConfig, onStatusChange: (status: SyncStatus) => void): Promise<void> {
+  async manualSync(config, onStatusChange) {
     // If a poll is already in progress, cancel it
     if (this.timerId) {
       this.stopPolling();

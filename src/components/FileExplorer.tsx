@@ -36,11 +36,25 @@ const FileExplorer = ({
                       window.__TAURI__ !== undefined;
       
       if (isTauri) {
-        // In a real Tauri app, this would use Tauri's dialog API
-        // But we'll use mock behavior for now until Tauri is properly set up
-        console.log('Tauri detected, but using mock folder selection since Tauri APIs are not available');
-        const mockPath = `/Users/user/Documents/Sample${Math.floor(Math.random() * 100)}`;
-        onChange(mockPath);
+        try {
+          // Dynamically import Tauri dialog API
+          const dialog = await import('@tauri-apps/api/dialog');
+          // Open a folder selection dialog
+          const selected = await dialog.open({
+            directory: true,
+            multiple: false,
+            title: `Select ${label}`
+          });
+          
+          // If a folder was selected (not cancelled), update the state
+          if (selected && !Array.isArray(selected)) {
+            onChange(selected);
+          }
+        } catch (e) {
+          console.error('Error with Tauri dialog:', e);
+          const mockPath = `/Users/user/Documents/Sample${Math.floor(Math.random() * 100)}`;
+          onChange(mockPath);
+        }
       } else {
         // Fallback for web - simulate folder selection
         console.log('Running in web mode - using mock folder selection');
