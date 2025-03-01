@@ -1,9 +1,11 @@
 
 import React, { useState } from 'react';
-import { Folder, X, AlertCircle } from 'lucide-react';
+import { Folder, X, AlertCircle, ChevronRight } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 type FileExplorerProps = {
   id: string;
@@ -13,6 +15,26 @@ type FileExplorerProps = {
   placeholder?: string;
   showError?: boolean;
   errorMessage?: string;
+};
+
+interface FolderItemProps {
+  name: string;
+  path: string;
+  isFolder?: boolean;
+  onSelect: (path: string) => void;
+}
+
+const FolderItem = ({ name, path, isFolder = true, onSelect }: FolderItemProps) => {
+  return (
+    <button
+      className="flex items-center w-full p-2 rounded-md hover:bg-muted text-left"
+      onClick={() => onSelect(path)}
+    >
+      <Folder className="h-4 w-4 mr-2 text-muted-foreground" />
+      <span className="truncate flex-1">{name}</span>
+      {isFolder && <ChevronRight className="h-4 w-4 ml-2 text-muted-foreground" />}
+    </button>
+  );
 };
 
 const FileExplorer = ({
@@ -25,6 +47,10 @@ const FileExplorer = ({
   errorMessage = "This field is required"
 }: FileExplorerProps) => {
   const [isFocused, setIsFocused] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [currentPath, setCurrentPath] = useState('');
+  const [folderHistory, setFolderHistory] = useState<string[]>([]);
+  const [folderContents, setFolderContents] = useState<{name: string, path: string, isFolder: boolean}[]>([]);
 
   // Try to use Tauri's native file dialogs when available
   const handleBrowse = async () => {
@@ -52,21 +78,81 @@ const FileExplorer = ({
           }
         } catch (e) {
           console.error('Error with Tauri dialog:', e);
-          const mockPath = `/Users/user/Documents/Sample${Math.floor(Math.random() * 100)}`;
-          onChange(mockPath);
+          // Try to open our custom folder browser dialog
+          openFolderBrowser();
         }
       } else {
-        // Fallback for web - simulate folder selection
-        console.log('Running in web mode - using mock folder selection');
-        const mockPath = `/Users/user/Documents/Sample${Math.floor(Math.random() * 100)}`;
-        onChange(mockPath);
+        // Use custom folder browser for web
+        openFolderBrowser();
       }
     } catch (error) {
       console.error('Error selecting folder:', error);
-      // Fallback for errors
-      const mockPath = `/Users/user/Documents/Sample${Math.floor(Math.random() * 100)}`;
-      onChange(mockPath);
+      openFolderBrowser();
     }
+  };
+
+  const openFolderBrowser = async () => {
+    setIsDialogOpen(true);
+    
+    // Initialize with mock root folders
+    const mockRootFolders = [
+      { name: 'Home', path: '/Users/user', isFolder: true },
+      { name: 'Documents', path: '/Users/user/Documents', isFolder: true },
+      { name: 'Desktop', path: '/Users/user/Desktop', isFolder: true },
+      { name: 'Downloads', path: '/Users/user/Downloads', isFolder: true },
+      { name: 'Applications', path: '/Applications', isFolder: true },
+    ];
+    
+    setCurrentPath('/');
+    setFolderContents(mockRootFolders);
+    setFolderHistory(['/']);
+  };
+
+  const handleFolderSelect = async (folderPath: string) => {
+    try {
+      // In a real implementation, we would use Tauri's fs API to read the folder contents
+      // For now, we'll simulate with mock data
+      setCurrentPath(folderPath);
+      setFolderHistory([...folderHistory, folderPath]);
+      
+      // Generate some mock subfolders
+      const randomSubfolderCount = Math.floor(Math.random() * 5) + 2;
+      const mockSubfolders = Array.from({ length: randomSubfolderCount }).map((_, index) => ({
+        name: `Folder ${index + 1}`,
+        path: `${folderPath}/Folder ${index + 1}`,
+        isFolder: true
+      }));
+      
+      setFolderContents(mockSubfolders);
+    } catch (error) {
+      console.error('Error browsing folder:', error);
+    }
+  };
+
+  const handleGoBack = () => {
+    if (folderHistory.length > 1) {
+      const newHistory = [...folderHistory];
+      newHistory.pop(); // Remove current path
+      const previousPath = newHistory[newHistory.length - 1];
+      
+      setCurrentPath(previousPath);
+      setFolderHistory(newHistory);
+      
+      // Generate mock contents for the previous folder
+      const randomSubfolderCount = Math.floor(Math.random() * 5) + 2;
+      const mockSubfolders = Array.from({ length: randomSubfolderCount }).map((_, index) => ({
+        name: `Folder ${index + 1}`,
+        path: `${previousPath}/Folder ${index + 1}`,
+        isFolder: true
+      }));
+      
+      setFolderContents(mockSubfolders);
+    }
+  };
+
+  const handleSelectFolder = () => {
+    onChange(currentPath);
+    setIsDialogOpen(false);
   };
 
   const handleClear = () => {
@@ -125,15 +211,65 @@ const FileExplorer = ({
             </Button>
           )}
           
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-7 px-2 text-xs font-medium"
-            onClick={handleBrowse}
-          >
-            Browse
-          </Button>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs font-medium"
+                onClick={handleBrowse}
+              >
+                Browse
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Browse Folders</DialogTitle>
+              </DialogHeader>
+              <div className="flex flex-col space-y-4">
+                <div className="flex items-center justify-between py-2 px-4 bg-muted/50 rounded-md">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleGoBack}
+                    disabled={folderHistory.length <= 1}
+                  >
+                    Back
+                  </Button>
+                  <span className="text-xs truncate max-w-[200px]">{currentPath}</span>
+                </div>
+                
+                <ScrollArea className="h-[250px]">
+                  <div className="space-y-1 p-1">
+                    {folderContents.map((item, index) => (
+                      <FolderItem
+                        key={index}
+                        name={item.name}
+                        path={item.path}
+                        isFolder={item.isFolder}
+                        onSelect={handleFolderSelect}
+                      />
+                    ))}
+                  </div>
+                </ScrollArea>
+                
+                <div className="flex justify-end space-x-2 pt-2">
+                  <Button 
+                    variant="outline"
+                    onClick={() => setIsDialogOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleSelectFolder}
+                  >
+                    Select This Folder
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
     </div>
