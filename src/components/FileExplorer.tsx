@@ -1,10 +1,10 @@
 
 import React, { useState } from 'react';
-import { Folder, X, AlertCircle, ChevronRight } from 'lucide-react';
+import { Folder, X, AlertCircle, ChevronRight, File } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 type FileExplorerProps = {
@@ -30,7 +30,11 @@ const FolderItem = ({ name, path, isFolder = true, onSelect }: FolderItemProps) 
       className="flex items-center w-full p-2 rounded-md hover:bg-muted text-left"
       onClick={() => onSelect(path)}
     >
-      <Folder className="h-4 w-4 mr-2 text-muted-foreground" />
+      {isFolder ? (
+        <Folder className="h-4 w-4 mr-2 text-muted-foreground" />
+      ) : (
+        <File className="h-4 w-4 mr-2 text-muted-foreground" />
+      )}
       <span className="truncate flex-1">{name}</span>
       {isFolder && <ChevronRight className="h-4 w-4 ml-2 text-muted-foreground" />}
     </button>
@@ -115,15 +119,23 @@ const FileExplorer = ({
       setCurrentPath(folderPath);
       setFolderHistory([...folderHistory, folderPath]);
       
-      // Generate some mock subfolders
-      const randomSubfolderCount = Math.floor(Math.random() * 5) + 2;
+      // Generate some mock subfolders and files
+      const randomSubfolderCount = Math.floor(Math.random() * 3) + 1;
+      const randomFileCount = Math.floor(Math.random() * 3) + 1;
+      
       const mockSubfolders = Array.from({ length: randomSubfolderCount }).map((_, index) => ({
         name: `Folder ${index + 1}`,
         path: `${folderPath}/Folder ${index + 1}`,
         isFolder: true
       }));
       
-      setFolderContents(mockSubfolders);
+      const mockFiles = Array.from({ length: randomFileCount }).map((_, index) => ({
+        name: `file${index + 1}.txt`,
+        path: `${folderPath}/file${index + 1}.txt`,
+        isFolder: false
+      }));
+      
+      setFolderContents([...mockSubfolders, ...mockFiles]);
     } catch (error) {
       console.error('Error browsing folder:', error);
     }
@@ -139,14 +151,22 @@ const FileExplorer = ({
       setFolderHistory(newHistory);
       
       // Generate mock contents for the previous folder
-      const randomSubfolderCount = Math.floor(Math.random() * 5) + 2;
+      const randomSubfolderCount = Math.floor(Math.random() * 3) + 1;
+      const randomFileCount = Math.floor(Math.random() * 2) + 1;
+      
       const mockSubfolders = Array.from({ length: randomSubfolderCount }).map((_, index) => ({
         name: `Folder ${index + 1}`,
         path: `${previousPath}/Folder ${index + 1}`,
         isFolder: true
       }));
       
-      setFolderContents(mockSubfolders);
+      const mockFiles = Array.from({ length: randomFileCount }).map((_, index) => ({
+        name: `file${index + 1}.txt`,
+        path: `${previousPath}/file${index + 1}.txt`,
+        isFolder: false
+      }));
+      
+      setFolderContents([...mockSubfolders, ...mockFiles]);
     }
   };
 
@@ -183,8 +203,8 @@ const FileExplorer = ({
           showError ? "border-destructive" : ""
         )}
       >
-        <div className="form-input-icon">
-          <Folder className="file-folder-icon" />
+        <div className="flex items-center absolute left-2.5 pointer-events-none">
+          <Folder className="h-4 w-4 text-muted-foreground" />
         </div>
         
         <Input
@@ -194,7 +214,7 @@ const FileExplorer = ({
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           placeholder={placeholder}
-          className="h-10 pl-10 pr-20 border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+          className="h-10 pl-9 pr-20 border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
         />
         
         <div className="absolute right-1.5 flex space-x-1">
@@ -226,6 +246,9 @@ const FileExplorer = ({
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
                 <DialogTitle>Browse Folders</DialogTitle>
+                <DialogDescription>
+                  Select a folder for {label.toLowerCase()}
+                </DialogDescription>
               </DialogHeader>
               <div className="flex flex-col space-y-4">
                 <div className="flex items-center justify-between py-2 px-4 bg-muted/50 rounded-md">
@@ -248,9 +271,14 @@ const FileExplorer = ({
                         name={item.name}
                         path={item.path}
                         isFolder={item.isFolder}
-                        onSelect={handleFolderSelect}
+                        onSelect={item.isFolder ? handleFolderSelect : () => {}}
                       />
                     ))}
+                    {folderContents.length === 0 && (
+                      <div className="p-2 text-center text-muted-foreground">
+                        No folders found
+                      </div>
+                    )}
                   </div>
                 </ScrollArea>
                 

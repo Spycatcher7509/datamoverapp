@@ -1,3 +1,4 @@
+
 import { toast } from "sonner";
 
 // Define and export the types needed by components
@@ -109,11 +110,28 @@ class FileSyncService {
     }
   }
 
+  // Reset synced files tracking
+  resetSyncedFiles() {
+    this.syncedFiles.clear();
+  }
+
   // Read files from a directory
   async readFiles(directory: string): Promise<string[]> {
+    if (!directory) {
+      console.error('Invalid directory path');
+      return [];
+    }
+
     try {
       if (this.isTauri && this.tauriFs) {
         try {
+          // Check if the directory exists
+          const exists = await this.tauriFs.exists(directory);
+          if (!exists) {
+            console.error(`Directory ${directory} does not exist`);
+            return [];
+          }
+
           const entries = await this.tauriFs.readDir(directory, { recursive: true });
           const files = [];
 
@@ -141,7 +159,7 @@ class FileSyncService {
       }
     } catch (error) {
       console.error(`Error reading directory ${directory}:`, error);
-      throw error;
+      return [];
     }
   }
 
@@ -159,6 +177,10 @@ class FileSyncService {
 
   // Sync a single file from source to destination
   async syncFile(sourcePath: string, destinationFolder: string): Promise<void> {
+    if (!sourcePath || !destinationFolder) {
+      throw new Error('Invalid source path or destination folder');
+    }
+
     try {
       if (this.isTauri && this.tauriFs && this.tauriPath) {
         try {
@@ -194,7 +216,7 @@ class FileSyncService {
     console.log(`Mock: Synced ${sourcePath} to ${destinationFolder}`);
     this.syncedFiles.add(sourcePath);
     
-    // Simulate a random success/fail
+    // Simulate a random success/fail (10% chance of failure)
     if (Math.random() > 0.9) {
       throw new Error('Random mock sync error');
     }
@@ -206,6 +228,11 @@ class FileSyncService {
     onStatusChange({ state: 'polling' });
 
     try {
+      // Validate source and destination
+      if (!config.sourceFolder || !config.destinationFolder) {
+        throw new Error('Source and destination folders must be specified');
+      }
+
       // Get files from source directory
       this.sourceFiles = await this.readFiles(config.sourceFolder);
       
@@ -258,6 +285,9 @@ class FileSyncService {
 
   // Manually trigger a sync
   async manualSync(config: SyncConfig, onStatusChange: (status: SyncStatus) => void): Promise<void> {
+    // Clear previously synced files to force re-sync
+    this.resetSyncedFiles();
+    
     // If a poll is already in progress, cancel it
     if (this.timerId) {
       this.stopPolling();

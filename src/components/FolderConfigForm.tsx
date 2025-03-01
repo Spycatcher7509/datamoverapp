@@ -28,13 +28,22 @@ const FolderConfigForm = ({
   setPollingInterval,
   validationErrors
 }: FolderConfigFormProps) => {
+  // Handle folder selection with validation
+  const handleSourceFolderChange = (value: string) => {
+    setSourceFolder(value);
+  };
+
+  const handleDestinationFolderChange = (value: string) => {
+    setDestinationFolder(value);
+  };
+
   return (
     <div className="space-y-4">
       <FileExplorer
         id="source-folder"
         label="Source Folder"
         value={sourceFolder}
-        onChange={setSourceFolder}
+        onChange={handleSourceFolderChange}
         placeholder="Select source folder to monitor"
         showError={validationErrors.source}
         errorMessage="Source folder is required"
@@ -44,7 +53,7 @@ const FolderConfigForm = ({
         id="destination-folder"
         label="Destination Folder"
         value={destinationFolder}
-        onChange={setDestinationFolder}
+        onChange={handleDestinationFolderChange}
         placeholder="Select destination folder"
         showError={validationErrors.destination || validationErrors.same}
         errorMessage={validationErrors.same ? "Must be different from source" : "Destination folder is required"}
