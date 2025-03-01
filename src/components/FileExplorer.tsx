@@ -4,7 +4,7 @@ import { Folder, X, AlertCircle } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { DialogTrigger } from "@/components/ui/dialog";
+import { Dialog } from "@/components/ui/dialog";
 import FolderBrowserDialog from './explorer/FolderBrowserDialog';
 import { openNativeDirectoryDialog } from './explorer/folderBrowserService';
 
@@ -99,26 +99,26 @@ const FileExplorer = ({
             </Button>
           )}
           
-          <DialogTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-7 px-2 text-xs font-medium"
-              onClick={handleBrowse}
-            >
-              Browse
-            </Button>
-          </DialogTrigger>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-xs font-medium"
+            onClick={handleBrowse}
+          >
+            Browse
+          </Button>
         </div>
       </div>
       
-      <FolderBrowserDialog 
-        isOpen={isDialogOpen}
-        onOpenChange={setIsDialogOpen}
-        onSelectFolder={onChange}
-        label={label}
-      />
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <FolderBrowserDialog 
+          isOpen={isDialogOpen}
+          onOpenChange={setIsDialogOpen}
+          onSelectFolder={onChange}
+          label={label}
+        />
+      </Dialog>
     </div>
   );
 };
