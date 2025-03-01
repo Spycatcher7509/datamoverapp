@@ -1,11 +1,12 @@
 
-import React, { useState } from 'react';
-import { Folder, X, AlertCircle, ChevronRight, File } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Folder, X, AlertCircle, ChevronRight, File, ChevronLeft, Home } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { environmentDetector } from '@/services/environmentDetector';
 
 type FileExplorerProps = {
   id: string;
@@ -55,19 +56,42 @@ const FileExplorer = ({
   const [currentPath, setCurrentPath] = useState('');
   const [folderHistory, setFolderHistory] = useState<string[]>([]);
   const [folderContents, setFolderContents] = useState<{name: string, path: string, isFolder: boolean}[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [platformRoot, setPlatformRoot] = useState<string>('');
+
+  // Initialize platform-specific root path
+  useEffect(() => {
+    const initPlatformRoot = async () => {
+      try {
+        if (environmentDetector.isReady()) {
+          // Get home directory when using Tauri
+          const homedir = await environmentDetector.tauriPath.homeDir();
+          setPlatformRoot(homedir);
+        } else {
+          // Mock for web environment
+          const platform = navigator.platform.toLowerCase();
+          if (platform.includes('win')) {
+            setPlatformRoot('C:\\');
+          } else {
+            setPlatformRoot('/home/user');
+          }
+        }
+      } catch (error) {
+        console.error('Failed to get platform root:', error);
+        setPlatformRoot('/');
+      }
+    };
+
+    initPlatformRoot();
+  }, []);
 
   // Try to use Tauri's native file dialogs when available
   const handleBrowse = async () => {
     try {
       // Check if we're running in Tauri
-      const isTauri = typeof window !== 'undefined' && 
-                      window !== null && 
-                      // @ts-ignore - Tauri types
-                      window.__TAURI__ !== undefined;
-      
-      if (isTauri) {
+      if (environmentDetector.isReady()) {
         try {
-          // Dynamically import Tauri dialog API
+          // Use Tauri dialog API
           const dialog = await import('@tauri-apps/api/dialog');
           // Open a folder selection dialog
           const selected = await dialog.open({
@@ -97,76 +121,160 @@ const FileExplorer = ({
 
   const openFolderBrowser = async () => {
     setIsDialogOpen(true);
+    setIsLoading(true);
     
-    // Initialize with mock root folders
-    const mockRootFolders = [
-      { name: 'Home', path: '/Users/user', isFolder: true },
-      { name: 'Documents', path: '/Users/user/Documents', isFolder: true },
-      { name: 'Desktop', path: '/Users/user/Desktop', isFolder: true },
-      { name: 'Downloads', path: '/Users/user/Downloads', isFolder: true },
-      { name: 'Applications', path: '/Applications', isFolder: true },
-    ];
+    try {
+      // Initialize with platform root
+      const rootPath = platformRoot || '/';
+      await loadFolderContents(rootPath);
+      setCurrentPath(rootPath);
+      setFolderHistory([rootPath]);
+    } catch (error) {
+      console.error('Error opening folder browser:', error);
+      // Fallback to common locations if we can't get the platform root
+      const commonLocations = [
+        { name: 'Home', path: platformRoot || '/home/user', isFolder: true },
+        { name: 'Documents', path: `${platformRoot}/Documents`, isFolder: true },
+        { name: 'Desktop', path: `${platformRoot}/Desktop`, isFolder: true },
+        { name: 'Downloads', path: `${platformRoot}/Downloads`, isFolder: true },
+      ];
+      
+      setFolderContents(commonLocations);
+      setCurrentPath('/');
+      setFolderHistory(['/']);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadFolderContents = async (folderPath: string) => {
+    setIsLoading(true);
     
-    setCurrentPath('/');
-    setFolderContents(mockRootFolders);
-    setFolderHistory(['/']);
+    try {
+      if (environmentDetector.isReady()) {
+        // Use Tauri FS API
+        try {
+          // Check if the path exists
+          const exists = await environmentDetector.tauriFs.exists(folderPath);
+          if (!exists) {
+            console.error(`Path does not exist: ${folderPath}`);
+            return;
+          }
+
+          // Read the directory contents
+          const entries = await environmentDetector.tauriFs.readDir(folderPath, { recursive: false });
+          
+          // Convert entries to our format
+          const formattedEntries = entries.map(entry => ({
+            name: entry.name || 'Unknown',
+            path: entry.path,
+            isFolder: !!entry.children || entry.isDirectory
+          }));
+          
+          // Sort folders first, then files
+          formattedEntries.sort((a, b) => {
+            if (a.isFolder === b.isFolder) {
+              return a.name.localeCompare(b.name);
+            }
+            return a.isFolder ? -1 : 1;
+          });
+          
+          setFolderContents(formattedEntries);
+        } catch (error) {
+          console.error('Error reading directory with Tauri:', error);
+          generateMockFolderContents(folderPath);
+        }
+      } else {
+        // Mock for web environment
+        generateMockFolderContents(folderPath);
+      }
+    } catch (error) {
+      console.error('Error loading folder contents:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const generateMockFolderContents = (folderPath: string) => {
+    // Generate mock folder structure for web preview
+    let mockContents: {name: string, path: string, isFolder: boolean}[] = [];
+    
+    // Check if we're at the root level
+    if (folderPath === '/' || folderPath === platformRoot) {
+      mockContents = [
+        { name: 'Documents', path: `${folderPath}/Documents`, isFolder: true },
+        { name: 'Pictures', path: `${folderPath}/Pictures`, isFolder: true },
+        { name: 'Downloads', path: `${folderPath}/Downloads`, isFolder: true },
+        { name: 'Desktop', path: `${folderPath}/Desktop`, isFolder: true },
+        { name: 'Applications', path: `${folderPath}/Applications`, isFolder: true },
+      ];
+    } else {
+      // Generate some random subfolders and files
+      const pathParts = folderPath.split(/[/\\]+/);
+      const folderName = pathParts[pathParts.length - 1];
+      
+      // Generate subfolders based on the folder name
+      if (folderName === 'Documents') {
+        mockContents = [
+          { name: 'Work', path: `${folderPath}/Work`, isFolder: true },
+          { name: 'Personal', path: `${folderPath}/Personal`, isFolder: true },
+          { name: 'budget.xlsx', path: `${folderPath}/budget.xlsx`, isFolder: false },
+          { name: 'report.docx', path: `${folderPath}/report.docx`, isFolder: false },
+        ];
+      } else if (folderName === 'Pictures') {
+        mockContents = [
+          { name: 'Vacation', path: `${folderPath}/Vacation`, isFolder: true },
+          { name: 'Family', path: `${folderPath}/Family`, isFolder: true },
+          { name: 'photo1.jpg', path: `${folderPath}/photo1.jpg`, isFolder: false },
+          { name: 'photo2.jpg', path: `${folderPath}/photo2.jpg`, isFolder: false },
+        ];
+      } else if (folderName === 'Downloads') {
+        mockContents = [
+          { name: 'Software', path: `${folderPath}/Software`, isFolder: true },
+          { name: 'app-installer.exe', path: `${folderPath}/app-installer.exe`, isFolder: false },
+          { name: 'document.pdf', path: `${folderPath}/document.pdf`, isFolder: false },
+        ];
+      } else {
+        // For any other folder, generate generic content
+        mockContents = [
+          { name: 'Subfolder 1', path: `${folderPath}/Subfolder 1`, isFolder: true },
+          { name: 'Subfolder 2', path: `${folderPath}/Subfolder 2`, isFolder: true },
+          { name: 'file1.txt', path: `${folderPath}/file1.txt`, isFolder: false },
+          { name: 'file2.txt', path: `${folderPath}/file2.txt`, isFolder: false },
+        ];
+      }
+    }
+    
+    setFolderContents(mockContents);
   };
 
   const handleFolderSelect = async (folderPath: string) => {
     try {
-      // In a real implementation, we would use Tauri's fs API to read the folder contents
-      // For now, we'll simulate with mock data
+      await loadFolderContents(folderPath);
       setCurrentPath(folderPath);
       setFolderHistory([...folderHistory, folderPath]);
-      
-      // Generate some mock subfolders and files
-      const randomSubfolderCount = Math.floor(Math.random() * 3) + 1;
-      const randomFileCount = Math.floor(Math.random() * 3) + 1;
-      
-      const mockSubfolders = Array.from({ length: randomSubfolderCount }).map((_, index) => ({
-        name: `Folder ${index + 1}`,
-        path: `${folderPath}/Folder ${index + 1}`,
-        isFolder: true
-      }));
-      
-      const mockFiles = Array.from({ length: randomFileCount }).map((_, index) => ({
-        name: `file${index + 1}.txt`,
-        path: `${folderPath}/file${index + 1}.txt`,
-        isFolder: false
-      }));
-      
-      setFolderContents([...mockSubfolders, ...mockFiles]);
     } catch (error) {
       console.error('Error browsing folder:', error);
     }
   };
 
-  const handleGoBack = () => {
+  const handleGoBack = async () => {
     if (folderHistory.length > 1) {
       const newHistory = [...folderHistory];
       newHistory.pop(); // Remove current path
       const previousPath = newHistory[newHistory.length - 1];
       
+      await loadFolderContents(previousPath);
       setCurrentPath(previousPath);
       setFolderHistory(newHistory);
-      
-      // Generate mock contents for the previous folder
-      const randomSubfolderCount = Math.floor(Math.random() * 3) + 1;
-      const randomFileCount = Math.floor(Math.random() * 2) + 1;
-      
-      const mockSubfolders = Array.from({ length: randomSubfolderCount }).map((_, index) => ({
-        name: `Folder ${index + 1}`,
-        path: `${previousPath}/Folder ${index + 1}`,
-        isFolder: true
-      }));
-      
-      const mockFiles = Array.from({ length: randomFileCount }).map((_, index) => ({
-        name: `file${index + 1}.txt`,
-        path: `${previousPath}/file${index + 1}.txt`,
-        isFolder: false
-      }));
-      
-      setFolderContents([...mockSubfolders, ...mockFiles]);
+    }
+  };
+
+  const handleGoHome = async () => {
+    if (platformRoot) {
+      await loadFolderContents(platformRoot);
+      setCurrentPath(platformRoot);
+      setFolderHistory([platformRoot]);
     }
   };
 
@@ -252,34 +360,51 @@ const FileExplorer = ({
               </DialogHeader>
               <div className="flex flex-col space-y-4">
                 <div className="flex items-center justify-between py-2 px-4 bg-muted/50 rounded-md">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={handleGoBack}
-                    disabled={folderHistory.length <= 1}
-                  >
-                    Back
-                  </Button>
+                  <div className="flex space-x-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={handleGoBack}
+                      disabled={folderHistory.length <= 1}
+                    >
+                      <ChevronLeft className="h-4 w-4 mr-1" />
+                      Back
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={handleGoHome}
+                    >
+                      <Home className="h-4 w-4 mr-1" />
+                      Home
+                    </Button>
+                  </div>
                   <span className="text-xs truncate max-w-[200px]">{currentPath}</span>
                 </div>
                 
                 <ScrollArea className="h-[250px]">
-                  <div className="space-y-1 p-1">
-                    {folderContents.map((item, index) => (
-                      <FolderItem
-                        key={index}
-                        name={item.name}
-                        path={item.path}
-                        isFolder={item.isFolder}
-                        onSelect={item.isFolder ? handleFolderSelect : () => {}}
-                      />
-                    ))}
-                    {folderContents.length === 0 && (
-                      <div className="p-2 text-center text-muted-foreground">
-                        No folders found
-                      </div>
-                    )}
-                  </div>
+                  {isLoading ? (
+                    <div className="flex justify-center items-center h-full">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                    </div>
+                  ) : (
+                    <div className="space-y-1 p-1">
+                      {folderContents.map((item, index) => (
+                        <FolderItem
+                          key={index}
+                          name={item.name}
+                          path={item.path}
+                          isFolder={item.isFolder}
+                          onSelect={item.isFolder ? handleFolderSelect : () => {}}
+                        />
+                      ))}
+                      {folderContents.length === 0 && (
+                        <div className="p-2 text-center text-muted-foreground">
+                          No folders found
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </ScrollArea>
                 
                 <div className="flex justify-end space-x-2 pt-2">
