@@ -43,41 +43,41 @@ const SyncErrorMessage = ({ syncStatus, onClearError }: SyncErrorMessageProps) =
               <XCircleIcon className="h-4 w-4 mr-1" />
               <span>Dismiss</span>
             </Button>
-            
-            <Dialog open={open} onOpenChange={setOpen}>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>
-                    Clear Sync Error
-                  </DialogTitle>
-                </DialogHeader>
-                
-                <div className="py-4">
-                  Are you sure you want to clear this error? This will reset the sync status.
-                </div>
-                
-                <DialogFooter>
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setOpen(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button 
-                    variant="destructive"
-                    onClick={() => {
-                      onClearError();
-                      setOpen(false);
-                    }}
-                  >
-                    Clear Error
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
           </div>
         </AlertDescription>
       </Alert>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              Clear Sync Error
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="py-4">
+            Are you sure you want to clear this error? This will reset the sync status.
+          </div>
+          
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={() => {
+                onClearError();
+                setOpen(false);
+              }}
+            >
+              Clear Error
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
