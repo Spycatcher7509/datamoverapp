@@ -4,13 +4,7 @@ import { DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/c
 import FolderBrowserHeader from './FolderBrowserHeader';
 import FolderBrowserContent from './FolderBrowserContent';
 import FolderBrowserFooter from './FolderBrowserFooter';
-import { loadFolderContents, getPlatformRoot } from './folderBrowserUtils';
-
-interface FolderItemData {
-  name: string;
-  path: string;
-  isFolder: boolean;
-}
+import { getPlatformRoot } from './folderBrowserUtils';
 
 interface FolderBrowserDialogProps {
   isOpen: boolean;
@@ -27,8 +21,6 @@ const FolderBrowserDialog = ({
 }: FolderBrowserDialogProps) => {
   const [currentPath, setCurrentPath] = useState('');
   const [folderHistory, setFolderHistory] = useState<string[]>([]);
-  const [folderContents, setFolderContents] = useState<FolderItemData[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [platformRoot, setPlatformRoot] = useState<string>('');
 
   // Initialize platform-specific root path
@@ -48,48 +40,30 @@ const FolderBrowserDialog = ({
     }
   }, [isOpen, platformRoot, folderHistory.length]);
 
-  const loadInitialFolder = async (rootPath: string) => {
-    await browseFolderContents(rootPath);
+  const loadInitialFolder = (rootPath: string) => {
     setCurrentPath(rootPath);
     setFolderHistory([rootPath]);
   };
 
-  const browseFolderContents = async (folderPath: string) => {
-    setIsLoading(true);
-    
-    try {
-      const contents = await loadFolderContents(folderPath);
-      setFolderContents(contents);
-    } finally {
-      setIsLoading(false);
-    }
+  const handleFolderSelect = (folderPath: string) => {
+    setCurrentPath(folderPath);
+    setFolderHistory([...folderHistory, folderPath]);
   };
 
-  const handleFolderSelect = async (folderPath: string) => {
-    try {
-      await browseFolderContents(folderPath);
-      setCurrentPath(folderPath);
-      setFolderHistory([...folderHistory, folderPath]);
-    } catch (error) {
-      console.error('Error browsing folder:', error);
-    }
-  };
-
-  const handleGoBack = async () => {
+  const handleGoBack = () => {
     if (folderHistory.length > 1) {
       const newHistory = [...folderHistory];
       newHistory.pop(); // Remove current path
       const previousPath = newHistory[newHistory.length - 1];
       
-      await browseFolderContents(previousPath);
       setCurrentPath(previousPath);
       setFolderHistory(newHistory);
     }
   };
 
-  const handleGoHome = async () => {
+  const handleGoHome = () => {
     if (platformRoot) {
-      await loadInitialFolder(platformRoot);
+      loadInitialFolder(platformRoot);
     }
   };
 
@@ -115,8 +89,7 @@ const FolderBrowserDialog = ({
         />
         
         <FolderBrowserContent 
-          isLoading={isLoading}
-          folderContents={folderContents}
+          currentPath={currentPath}
           onSelectFolder={handleFolderSelect}
         />
         

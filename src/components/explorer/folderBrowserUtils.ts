@@ -8,6 +8,11 @@ interface FolderItem {
 }
 
 export const loadFolderContents = async (folderPath: string): Promise<FolderItem[]> => {
+  if (!folderPath) {
+    console.error('Invalid folder path');
+    return [];
+  }
+  
   try {
     if (environmentDetector.isReady()) {
       // Use Tauri FS API
@@ -48,7 +53,7 @@ export const loadFolderContents = async (folderPath: string): Promise<FolderItem
     }
   } catch (error) {
     console.error('Error loading folder contents:', error);
-    return [];
+    throw new Error(`Failed to load folder contents: ${(error as Error).message}`);
   }
 };
 
