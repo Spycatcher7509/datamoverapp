@@ -7,7 +7,8 @@ import SyncHeader from './SyncHeader';
 import SyncControls from './SyncControls';
 import SyncErrorMessage from './SyncErrorMessage';
 import FolderConfigForm from './FolderConfigForm';
-import { fileSyncService, SyncConfig, SyncStatus as SyncStatusType } from '../services/fileSyncService';
+import { fileSyncService } from '../services/fileSyncService';
+import type { SyncConfig, SyncStatus as SyncStatusType } from '../services/types';
 
 const FileSyncApp = () => {
   // App state
