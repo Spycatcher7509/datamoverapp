@@ -20,39 +20,76 @@ export const loadFolderContents = async (folderPath: string): Promise<FolderItem
       await environmentDetector.waitForInit();
       
       try {
-        // Check if the path exists
-        const exists = await environmentDetector.tauriFs.exists(folderPath);
-        if (!exists) {
-          console.error(`Path does not exist: ${folderPath}`);
-          throw new Error(`The folder "${folderPath}" does not exist or cannot be accessed`);
-        }
-
-        console.log(`Reading directory: ${folderPath}`);
-        
-        // Read the directory contents
-        const entries = await environmentDetector.tauriFs.readDir(folderPath, { recursive: false });
-        
-        console.log(`Got ${entries?.length || 0} entries from: ${folderPath}`);
-        
-        // Convert entries to our format
-        const formattedEntries = entries.map(entry => ({
-          name: entry.name || 'Unknown',
-          path: entry.path,
-          isFolder: !!entry.children || entry.isDirectory
-        }));
-        
-        // Sort folders first, then files
-        formattedEntries.sort((a, b) => {
-          if (a.isFolder === b.isFolder) {
-            return a.name.localeCompare(b.name);
+        if (environmentDetector.isTauri) {
+          // Tauri implementation
+          const exists = await environmentDetector.tauriFs.exists(folderPath);
+          if (!exists) {
+            console.error(`Path does not exist: ${folderPath}`);
+            throw new Error(`The folder "${folderPath}" does not exist or cannot be accessed`);
           }
-          return a.isFolder ? -1 : 1;
-        });
-        
-        return formattedEntries;
+
+          console.log(`Reading directory: ${folderPath}`);
+          
+          // Read the directory contents
+          const entries = await environmentDetector.tauriFs.readDir(folderPath, { recursive: false });
+          
+          console.log(`Got ${entries?.length || 0} entries from: ${folderPath}`);
+          
+          // Convert entries to our format
+          const formattedEntries = entries.map(entry => ({
+            name: entry.name || 'Unknown',
+            path: entry.path,
+            isFolder: !!entry.children || entry.isDirectory
+          }));
+          
+          // Sort folders first, then files
+          formattedEntries.sort((a, b) => {
+            if (a.isFolder === b.isFolder) {
+              return a.name.localeCompare(b.name);
+            }
+            return a.isFolder ? -1 : 1;
+          });
+          
+          return formattedEntries;
+        } else if (environmentDetector.isCapacitor) {
+          // Capacitor implementation for Android
+          try {
+            // Import Filesystem from Capacitor
+            const { Filesystem, Directory } = await import('@capacitor/filesystem');
+            
+            const result = await Filesystem.readdir({
+              path: folderPath === '/' ? '' : folderPath,
+              directory: Directory.ExternalStorage
+            });
+            
+            // Process results
+            const formattedEntries = result.files.map(file => ({
+              name: file.name,
+              path: `${folderPath}/${file.name}`.replace('//', '/'),
+              isFolder: file.type.includes('directory')
+            }));
+            
+            // Sort folders first, then files
+            formattedEntries.sort((a, b) => {
+              if (a.isFolder === b.isFolder) {
+                return a.name.localeCompare(b.name);
+              }
+              return a.isFolder ? -1 : 1;
+            });
+            
+            return formattedEntries;
+          } catch (err) {
+            console.error('Error reading directory with Capacitor:', err);
+            toast.error(`Failed to browse folder: ${(err as Error).message}`);
+            return generateMockFolderContents(folderPath);
+          }
+        } else {
+          console.log('Environment not ready, using mock data');
+          return generateMockFolderContents(folderPath);
+        }
       } catch (error) {
-        console.error('Error reading directory with Tauri:', error);
-        toast.error(`Error browsing folder: ${(error as Error).message}`);
+        console.error('Error reading directory:', error);
+        toast.error(`Failed to browse folder: ${(error as Error).message}`);
         return generateMockFolderContents(folderPath);
       }
     } else {
@@ -125,29 +162,34 @@ export const getPlatformRoot = async (): Promise<string> => {
     await environmentDetector.waitForInit();
     
     if (environmentDetector.isReady()) {
-      // Get home directory when using Tauri
-      try {
-        const homedir = await environmentDetector.tauriPath.homeDir();
-        console.log(`Got home directory: ${homedir}`);
-        return homedir;
-      } catch (error) {
-        console.error('Error getting home directory:', error);
-        // Fallback to basic root paths if error occurs
-        if (navigator.platform.toLowerCase().includes('win')) {
-          return 'C:\\';
-        } else {
-          return '/home/user';
+      if (environmentDetector.isTauri) {
+        // Get home directory when using Tauri
+        try {
+          const homedir = await environmentDetector.tauriPath.homeDir();
+          console.log(`Got home directory: ${homedir}`);
+          return homedir;
+        } catch (error) {
+          console.error('Error getting home directory:', error);
+          // Fallback to basic root paths if error occurs
+          if (navigator.platform.toLowerCase().includes('win')) {
+            return 'C:\\';
+          } else {
+            return '/home/user';
+          }
         }
+      } else if (environmentDetector.isCapacitor) {
+        // For Android, return the root of external storage
+        return '/';
       }
+    }
+    
+    // Mock for web environment
+    console.log('Using mock platform root in web environment');
+    const platform = navigator.platform.toLowerCase();
+    if (platform.includes('win')) {
+      return 'C:\\';
     } else {
-      // Mock for web environment
-      console.log('Using mock platform root in web environment');
-      const platform = navigator.platform.toLowerCase();
-      if (platform.includes('win')) {
-        return 'C:\\';
-      } else {
-        return '/home/user';
-      }
+      return '/home/user';
     }
   } catch (error) {
     console.error('Failed to get platform root:', error);
