@@ -1,3 +1,4 @@
+
 import { FolderSyncIcon } from 'lucide-react';
 import SyncStatus from './SyncStatus';
 import { SyncStatus as SyncStatusType } from '../services/types';
