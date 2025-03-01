@@ -3,7 +3,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { 
   Dialog,
-  DialogTrigger, 
   DialogContent, 
   DialogHeader, 
   DialogTitle,
@@ -36,14 +35,16 @@ const SyncErrorMessage = ({ syncStatus, onClearError }: SyncErrorMessageProps) =
           </div>
           
           <div className="flex items-center space-x-2 ml-4 mt-1">
+            <Button 
+              variant="ghost" 
+              className="h-6 px-2"
+              onClick={() => setOpen(true)}
+            >
+              <XCircleIcon className="h-4 w-4 mr-1" />
+              <span>Dismiss</span>
+            </Button>
+            
             <Dialog open={open} onOpenChange={setOpen}>
-              <DialogTrigger asChild>
-                <Button variant="ghost" className="h-6 px-2">
-                  <XCircleIcon className="h-4 w-4 mr-1" />
-                  <span>Dismiss</span>
-                </Button>
-              </DialogTrigger>
-              
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>
