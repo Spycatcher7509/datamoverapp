@@ -1,5 +1,6 @@
 
 import { environmentDetector } from './environmentDetector';
+import { SyncResult, SyncFileDetail } from './types';
 
 /**
  * Service to handle file-related operations
@@ -109,7 +110,55 @@ class FileOperations {
       throw new Error('Random mock sync error');
     }
   }
+
+  // Get files that need to be synced
+  async getFilesToSync(config: any): Promise<string[]> {
+    // This would normally check timestamps, etc.
+    // For now, we'll just return some mock files
+    return this.getMockFiles(config.sourceFolder);
+  }
+
+  // Copy multiple files from source to destination
+  async copyFiles(config: any, filesToSync: string[]): Promise<SyncResult> {
+    const result: SyncResult = {
+      syncedCount: 0,
+      errorCount: 0,
+      details: []
+    };
+
+    for (const filePath of filesToSync) {
+      const detail: SyncFileDetail = {
+        sourcePath: filePath,
+        destinationPath: `${config.destinationFolder}/${filePath.split('/').pop()}`,
+        success: false
+      };
+
+      try {
+        await this.syncFile(filePath, config.destinationFolder);
+        detail.success = true;
+        result.syncedCount++;
+      } catch (error) {
+        detail.error = error instanceof Error ? error.message : 'Unknown error';
+        result.errorCount++;
+      }
+
+      result.details.push(detail);
+    }
+
+    return result;
+  }
+
+  // Reset sync state
+  async resetSyncedFiles(): Promise<void> {
+    console.log('Resetting synced files state');
+    // This would clear local storage or a DB in a real app
+  }
 }
 
 // Create and export a singleton instance
 export const fileOperations = new FileOperations();
+
+// Export required functions
+export const getFilesToSync = async (config: any) => fileOperations.getFilesToSync(config);
+export const copyFiles = async (config: any, filesToSync: string[]) => fileOperations.copyFiles(config, filesToSync);
+export const resetSyncedFiles = async () => fileOperations.resetSyncedFiles();

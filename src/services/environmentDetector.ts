@@ -42,3 +42,6 @@ class EnvironmentDetector {
 
 // Create and export a singleton instance
 export const environmentDetector = new EnvironmentDetector();
+
+// Export the isTauri property directly
+export const isTauri = environmentDetector.isTauri;

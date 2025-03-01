@@ -8,8 +8,24 @@ export interface SyncConfig {
 }
 
 export interface SyncStatus {
-  state: 'idle' | 'polling' | 'syncing' | 'success' | 'error';
+  state: 'idle' | 'polling' | 'checking' | 'syncing' | 'success' | 'error' | 'active';
   message?: string;
   lastSync?: string;
+  lastSyncTime?: number;
+  lastSyncResult?: SyncResult;
   error?: string;
+  filesCount?: number;
+}
+
+export interface SyncFileDetail {
+  sourcePath: string;
+  destinationPath: string;
+  success: boolean;
+  error?: string;
+}
+
+export interface SyncResult {
+  syncedCount: number;
+  errorCount: number;
+  details: SyncFileDetail[];
 }

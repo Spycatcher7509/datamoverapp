@@ -1,5 +1,6 @@
+
 import { SyncConfig, SyncStatus, SyncResult } from './types';
-import { isTauri } from './environmentDetector';
+import { environmentDetector } from './environmentDetector';
 import { copyFiles, getFilesToSync, resetSyncedFiles } from './fileOperations';
 
 // Polling interval ID for background sync
@@ -29,43 +30,47 @@ export const fileSyncService = {
     }
     
     lastSyncTime = Date.now();
-    statusCallback({ state: 'active', message: 'Monitoring for changes', lastSyncTime });
+    statusCallback({ 
+      state: 'polling', 
+      message: 'Monitoring for changes', 
+      lastSyncTime
+    });
     
     // Set polling interval in seconds
     const intervalMs = config.pollingInterval * 1000;
     
     pollingIntervalId = setInterval(async () => {
       try {
-        // Don't run sync if already syncing
-        if (statusCallback({ state: 'checking' })) {
-          // Check for files that need sync
-          const filesToSync = await getFilesToSync(config);
+        // Check for files that need sync
+        statusCallback({ state: 'checking' });
+        
+        // Check for files that need sync
+        const filesToSync = await getFilesToSync(config);
+        
+        // If files need syncing, sync them
+        if (filesToSync.length > 0) {
+          statusCallback({ 
+            state: 'syncing', 
+            message: `Syncing ${filesToSync.length} files...`,
+            filesCount: filesToSync.length 
+          });
           
-          // If files need syncing, sync them
-          if (filesToSync.length > 0) {
-            statusCallback({ 
-              state: 'syncing', 
-              message: `Syncing ${filesToSync.length} files...`,
-              filesCount: filesToSync.length 
-            });
-            
-            const result = await copyFiles(config, filesToSync);
-            
-            lastSyncTime = Date.now();
-            statusCallback({ 
-              state: 'active', 
-              message: `Synced ${result.syncedCount} files`, 
-              lastSyncTime,
-              lastSyncResult: result
-            });
-          } else {
-            // No files to sync - still active
-            statusCallback({ 
-              state: 'active', 
-              message: 'Monitoring for changes', 
-              lastSyncTime 
-            });
-          }
+          const result = await copyFiles(config, filesToSync);
+          
+          lastSyncTime = Date.now();
+          statusCallback({ 
+            state: 'success', 
+            message: `Synced ${result.syncedCount} files`, 
+            lastSyncTime,
+            lastSyncResult: result
+          });
+        } else {
+          // No files to sync - still active
+          statusCallback({ 
+            state: 'polling', 
+            message: 'Monitoring for changes', 
+            lastSyncTime 
+          });
         }
       } catch (error) {
         // Handle sync errors
@@ -109,7 +114,7 @@ export const fileSyncService = {
       if (filesToSync.length === 0) {
         lastSyncTime = Date.now();
         statusCallback({ 
-          state: 'active', 
+          state: 'success', 
           message: 'No files need syncing', 
           lastSyncTime
         });
@@ -129,7 +134,7 @@ export const fileSyncService = {
       // Update status to complete
       lastSyncTime = Date.now();
       statusCallback({ 
-        state: 'active', 
+        state: 'success', 
         message: `Synced ${result.syncedCount} files`, 
         lastSyncTime,
         lastSyncResult: result
