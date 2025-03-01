@@ -7,11 +7,10 @@ import SyncHeader from './SyncHeader';
 import SyncControls from './SyncControls';
 import SyncErrorMessage from './SyncErrorMessage';
 import FolderConfigForm from './FolderConfigForm';
-import { fileSyncService } from '../services/fileSyncService';
-import { SyncConfig, SyncStatus as SyncStatusType } from '../services/types';
+import { fileSyncService, SyncConfig, SyncStatus as SyncStatusType } from '../services/fileSyncService';
 
 const FileSyncApp = () => {
-  // App state with safe defaults
+  // App state
   const [sourceFolder, setSourceFolder] = useState<string>('');
   const [destinationFolder, setDestinationFolder] = useState<string>('');
   const [pollingInterval, setPollingInterval] = useState<number>(5);
@@ -61,17 +60,11 @@ const FileSyncApp = () => {
     return true;
   };
 
-  // First effect to handle stopping polling when sync is disabled
-  useEffect(() => {
-    if (!isEnabled) {
-      fileSyncService.stopPolling();
-    }
-  }, [isEnabled]);
-  
-  // Second effect to handle starting polling when config changes
+  // Start/stop sync based on configuration changes
   useEffect(() => {
     // If not enabled, don't start sync
     if (!isEnabled) {
+      fileSyncService.stopPolling();
       return;
     }
     
@@ -91,7 +84,7 @@ const FileSyncApp = () => {
     
     fileSyncService.startPolling(config, handleStatusChange);
     
-    // Clean up on unmount or when dependencies change
+    // Clean up on unmount
     return () => {
       fileSyncService.stopPolling();
     };
@@ -141,44 +134,38 @@ const FileSyncApp = () => {
     setSyncStatus({ state: 'idle' });
   };
 
-  // Adding try-catch to protect the render
-  try {
-    return (
-      <AppCard>
-        <SyncHeader syncStatus={syncStatus} />
-        
-        <Separator className="my-4" />
-        
-        <FolderConfigForm
-          sourceFolder={sourceFolder}
-          setSourceFolder={setSourceFolder}
-          destinationFolder={destinationFolder}
-          setDestinationFolder={setDestinationFolder}
-          pollingInterval={pollingInterval}
-          setPollingInterval={setPollingInterval}
-          validationErrors={validationErrors}
-        />
-        
-        <Separator className="my-4" />
-        
-        <SyncControls
-          isEnabled={isEnabled}
-          toggleSync={toggleSync}
-          handleManualSync={handleManualSync}
-          isManualSyncing={isManualSyncing}
-          syncStatus={syncStatus}
-        />
-        
-        <SyncErrorMessage 
-          syncStatus={syncStatus}
-          onClearError={handleClearError}
-        />
-      </AppCard>
-    );
-  } catch (error) {
-    console.error("Render error in FileSyncApp:", error);
-    return <div className="p-6 text-red-500">An error occurred while rendering the application. Please check the console for details.</div>;
-  }
+  return (
+    <AppCard>
+      <SyncHeader syncStatus={syncStatus} />
+      
+      <Separator className="my-4" />
+      
+      <FolderConfigForm
+        sourceFolder={sourceFolder}
+        setSourceFolder={setSourceFolder}
+        destinationFolder={destinationFolder}
+        setDestinationFolder={setDestinationFolder}
+        pollingInterval={pollingInterval}
+        setPollingInterval={setPollingInterval}
+        validationErrors={validationErrors}
+      />
+      
+      <Separator className="my-4" />
+      
+      <SyncControls
+        isEnabled={isEnabled}
+        toggleSync={toggleSync}
+        handleManualSync={handleManualSync}
+        isManualSyncing={isManualSyncing}
+        syncStatus={syncStatus}
+      />
+      
+      <SyncErrorMessage 
+        syncStatus={syncStatus}
+        onClearError={handleClearError}
+      />
+    </AppCard>
+  );
 };
 
 export default FileSyncApp;

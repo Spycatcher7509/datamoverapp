@@ -1,8 +1,9 @@
+
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { PauseIcon, PlayIcon, RefreshCw } from 'lucide-react';
 import { toast } from "sonner";
-import { SyncStatus as SyncStatusType } from '../services/types';
+import { SyncStatus as SyncStatusType } from '@/services/fileSyncService';
 
 interface SyncControlsProps {
   isEnabled: boolean;
