@@ -2,14 +2,14 @@
 import { toast } from "sonner";
 
 // Define and export the types needed by components
-export interface SyncConfig {
+export type SyncConfig = {
   sourceFolder: string;
   destinationFolder: string;
   pollingInterval: number;
   enabled: boolean;
 }
 
-export interface SyncStatus {
+export type SyncStatus = {
   state: 'idle' | 'polling' | 'syncing' | 'success' | 'error';
   message?: string;
   lastSync?: string;
