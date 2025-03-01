@@ -34,11 +34,15 @@ const FolderBrowserContent = ({
     staleTime: 5 * 60 * 1000, // 5 minutes
     refetchOnWindowFocus: false,
     retry: 1, // Only retry once to avoid multiple error messages
-    onError: (error) => {
+  });
+
+  // Log errors but use component state to handle UI updates
+  React.useEffect(() => {
+    if (isError && error) {
       console.error('Error loading folder contents:', error);
       toast.error(`Failed to load folder: ${(error as Error).message}`);
     }
-  });
+  }, [isError, error]);
 
   if (isLoading) {
     return (
@@ -70,7 +74,7 @@ const FolderBrowserContent = ({
   return (
     <ScrollArea className="h-[250px]">
       <div className="space-y-1 p-1">
-        {folderContents.map((item, index) => (
+        {folderContents.map((item: FolderItemData, index: number) => (
           <FolderItem
             key={index}
             name={item.name}

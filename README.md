@@ -1,69 +1,73 @@
-# Welcome to your Lovable project
 
-## Project info
+# FileSync Application
 
-**URL**: https://lovable.dev/projects/313805c5-15c7-480e-bb57-bbaa00293d98
+A desktop application for syncing files between folders, built with Tauri, React, and TypeScript.
 
-## How can I edit this code?
+## Features
 
-There are several ways of editing your application.
+- Browse and select folders using native file dialogs
+- Configure source and destination folders for file synchronization
+- Set custom polling intervals for automatic sync
+- Manual sync option
+- Status updates and notifications
+- Cross-platform (Windows, macOS, Linux)
 
-**Use Lovable**
+## Development Setup
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/313805c5-15c7-480e-bb57-bbaa00293d98) and start prompting.
+### Prerequisites
 
-Changes made via Lovable will be committed automatically to this repo.
+Before you can build this application, you'll need:
 
-**Use your preferred IDE**
+1. **Rust** - Install from [https://rustup.rs/](https://rustup.rs/)
+2. **Node.js** - Install from [https://nodejs.org/](https://nodejs.org/)
+3. **Platform-specific dependencies**:
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+   **For macOS**:
+   ```
+   xcode-select --install
+   ```
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+   **For Windows**:
+   - Visual Studio C++ Build Tools
+   - WebView2 component
 
-Follow these steps:
+   **For Linux**:
+   ```
+   sudo apt update
+   sudo apt install libwebkit2gtk-4.0-dev build-essential curl wget libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+   ```
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+### Running in Development Mode
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+```bash
+# Install dependencies
+npm install
 
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+# Start the development server
+npm run tauri dev
 ```
 
-**Edit a file directly in GitHub**
+### Building the Standalone Application
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```bash
+# Build the production version
+npm run tauri build
+```
 
-**Use GitHub Codespaces**
+After building, you'll find the distributable files in the `src-tauri/target/release/bundle` directory, organized by platform:
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+- **Windows**: `src-tauri/target/release/bundle/msi/` - Contains the MSI installer
+- **macOS**: `src-tauri/target/release/bundle/dmg/` - Contains the DMG installer
+- **Linux**: `src-tauri/target/release/bundle/appimage/` and `src-tauri/target/release/bundle/deb/` - Contains AppImage and DEB packages
 
-## What technologies are used for this project?
+## Troubleshooting
 
-This project is built with .
+If you encounter issues with the build process:
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+1. Ensure all prerequisites are installed for your platform
+2. Check the Tauri logs for detailed error messages
+3. Make sure you have proper permissions for file system operations
 
-## How can I deploy this project?
+## License
 
-Simply open [Lovable](https://lovable.dev/projects/313805c5-15c7-480e-bb57-bbaa00293d98) and click on Share -> Publish.
-
-## I want to use a custom domain - is that possible?
-
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
+This project is licensed under the MIT License - see the LICENSE file for details.
