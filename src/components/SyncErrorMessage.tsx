@@ -1,7 +1,6 @@
-
 import { Button } from "@/components/ui/button";
 import { AlertCircle } from 'lucide-react';
-import { SyncStatus as SyncStatusType } from '@/services/fileSyncService';
+import { SyncStatus as SyncStatusType } from '@/services/types';
 
 interface SyncErrorMessageProps {
   syncStatus: SyncStatusType;

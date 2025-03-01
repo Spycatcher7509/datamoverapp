@@ -1,7 +1,6 @@
-
 import { FolderSyncIcon } from 'lucide-react';
 import SyncStatus from './SyncStatus';
-import { SyncStatus as SyncStatusType } from '../services/fileSyncService';
+import { SyncStatus as SyncStatusType } from '../services/types';
 
 interface SyncHeaderProps {
   syncStatus: SyncStatusType;
