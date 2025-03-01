@@ -60,6 +60,11 @@ class FileSyncService {
 
   // Start the polling process
   startPolling(config: SyncConfig, onStatusChange: (status: SyncStatus) => void) {
+    if (!config) {
+      onStatusChange({ state: 'error', error: 'Invalid configuration' });
+      return;
+    }
+
     if (this.timerId) {
       this.stopPolling();
     }
@@ -87,19 +92,37 @@ class FileSyncService {
       return;
     }
 
+    // Validate polling interval
+    const interval = Number(config.pollingInterval);
+    if (isNaN(interval) || interval <= 0) {
+      onStatusChange({
+        state: 'error',
+        error: 'Polling interval must be a positive number'
+      });
+      return;
+    }
+
     // Convert seconds to milliseconds
-    const intervalMs = config.pollingInterval * 1000;
+    const intervalMs = interval * 1000;
 
     // Initial status update
     onStatusChange({ state: 'polling' });
 
-    // Perform immediate sync
-    this.performSync(config, onStatusChange);
-
-    // Set up polling interval
-    this.timerId = window.setInterval(() => {
+    try {
+      // Perform immediate sync
       this.performSync(config, onStatusChange);
-    }, intervalMs);
+
+      // Set up polling interval
+      this.timerId = window.setInterval(() => {
+        this.performSync(config, onStatusChange);
+      }, intervalMs);
+    } catch (error) {
+      console.error('Error starting polling:', error);
+      onStatusChange({
+        state: 'error',
+        error: error instanceof Error ? error.message : 'Failed to start monitoring'
+      });
+    }
   }
 
   // Stop the polling process
@@ -137,6 +160,9 @@ class FileSyncService {
 
           // Helper function to recursively get files
           const processEntries = async (entries) => {
+            if (!entries || !Array.isArray(entries)) {
+              return;
+            }
             for (const entry of entries) {
               if (entry.children) {
                 await processEntries(entry.children);
@@ -224,6 +250,11 @@ class FileSyncService {
 
   // Perform a single sync operation
   async performSync(config: SyncConfig, onStatusChange: (status: SyncStatus) => void): Promise<void> {
+    if (!config || !onStatusChange) {
+      console.error('Invalid config or status callback');
+      return;
+    }
+
     // First update status to polling
     onStatusChange({ state: 'polling' });
 
@@ -243,24 +274,58 @@ class FileSyncService {
         // Update status to syncing
         onStatusChange({ state: 'syncing' });
         
+        // Track successful syncs
+        let successCount = 0;
+        let errorCount = 0;
+        
         // Sync each file
         for (const file of filesToSync) {
-          await this.syncFile(file, config.destinationFolder);
+          try {
+            await this.syncFile(file, config.destinationFolder);
+            successCount++;
+          } catch (error) {
+            errorCount++;
+            console.error(`Failed to sync file ${file}:`, error);
+            // Continue with other files even if one fails
+          }
         }
         
         this.lastSyncTime = new Date();
         // Format current time
         const timeString = this.lastSyncTime.toLocaleTimeString();
         
-        // Update status to success
-        onStatusChange({
-          state: 'success',
-          message: `Synced ${filesToSync.length} files`,
-          lastSync: timeString
-        });
-        
-        // Show toast notification
-        toast.success(`Synced ${filesToSync.length} files to destination`);
+        if (errorCount > 0) {
+          if (successCount > 0) {
+            // Some succeeded, some failed
+            onStatusChange({
+              state: 'success',
+              message: `Synced ${successCount} files, ${errorCount} failed`,
+              lastSync: timeString,
+              error: `${errorCount} files failed to sync`
+            });
+            
+            toast.warning(`Synced ${successCount} files, but ${errorCount} failed`);
+          } else {
+            // All failed
+            onStatusChange({
+              state: 'error',
+              message: `Failed to sync ${errorCount} files`,
+              error: 'All file sync operations failed',
+              lastSync: timeString
+            });
+            
+            toast.error(`Failed to sync ${errorCount} files to destination`);
+          }
+        } else {
+          // All succeeded
+          onStatusChange({
+            state: 'success',
+            message: `Synced ${successCount} files`,
+            lastSync: timeString
+          });
+          
+          toast.success(`Synced ${successCount} files to destination`);
+        }
       } else {
         // No changes found, update status to idle
         onStatusChange({
@@ -275,7 +340,8 @@ class FileSyncService {
       
       onStatusChange({
         state: 'error',
-        error: errorMessage
+        error: errorMessage,
+        lastSync: this.lastSyncTime ? this.lastSyncTime.toLocaleTimeString() : undefined
       });
       
       // Show error toast
@@ -285,20 +351,36 @@ class FileSyncService {
 
   // Manually trigger a sync
   async manualSync(config: SyncConfig, onStatusChange: (status: SyncStatus) => void): Promise<void> {
-    // Clear previously synced files to force re-sync
-    this.resetSyncedFiles();
-    
-    // If a poll is already in progress, cancel it
-    if (this.timerId) {
-      this.stopPolling();
+    if (!config || !onStatusChange) {
+      console.error('Invalid config or status callback');
+      return;
     }
     
-    // Perform a sync
-    await this.performSync(config, onStatusChange);
-    
-    // If enabled, restart polling
-    if (config.enabled) {
-      this.startPolling(config, onStatusChange);
+    try {
+      // Clear previously synced files to force re-sync
+      this.resetSyncedFiles();
+      
+      // If a poll is already in progress, cancel it
+      if (this.timerId) {
+        this.stopPolling();
+      }
+      
+      // Perform a sync
+      await this.performSync(config, onStatusChange);
+      
+      // If enabled, restart polling
+      if (config.enabled) {
+        this.startPolling(config, onStatusChange);
+      }
+    } catch (error) {
+      console.error('Manual sync failed:', error);
+      onStatusChange({
+        state: 'error',
+        error: error instanceof Error ? error.message : 'Manual sync failed',
+        lastSync: this.lastSyncTime ? this.lastSyncTime.toLocaleTimeString() : undefined
+      });
+      
+      toast.error('Manual sync failed');
     }
   }
 }
