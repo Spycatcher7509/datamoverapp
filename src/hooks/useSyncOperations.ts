@@ -2,21 +2,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from "sonner";
 import { fileSyncService } from '../services/fileSyncService';
-import type { SyncConfig, SyncStatus } from '../services/types';
+import type { SyncConfig } from '../services/types';
+import { useSyncStatus } from './useSyncStatus';
 
 export function useSyncOperations(isEnabled: boolean, setIsEnabled: (value: boolean) => void) {
-  const [syncStatus, setSyncStatus] = useState<SyncStatus>({ state: 'idle' });
+  const { syncStatus, handleStatusChange, handleClearError } = useSyncStatus(setIsEnabled);
   const [isManualSyncing, setIsManualSyncing] = useState<boolean>(false);
-
-  // Handle status updates from the sync service
-  const handleStatusChange = useCallback((status: SyncStatus) => {
-    setSyncStatus(status);
-    
-    // If we got an error, also disable the sync
-    if (status.state === 'error') {
-      setIsEnabled(false);
-    }
-  }, [setIsEnabled]);
 
   const startSync = useCallback((config: SyncConfig) => {
     fileSyncService.startPolling(config, handleStatusChange);
@@ -58,10 +49,6 @@ export function useSyncOperations(isEnabled: boolean, setIsEnabled: (value: bool
       setIsManualSyncing(false);
     }
   }, [handleStatusChange]);
-
-  const handleClearError = useCallback(() => {
-    setSyncStatus({ state: 'idle' });
-  }, []);
 
   // Clean up effect
   useEffect(() => {
