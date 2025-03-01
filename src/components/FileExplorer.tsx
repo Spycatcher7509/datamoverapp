@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { Dialog } from "@/components/ui/dialog";
 import FolderBrowserDialog from './explorer/FolderBrowserDialog';
 import { openNativeDirectoryDialog } from './explorer/folderBrowserService';
+import { toast } from 'sonner';
 
 type FileExplorerProps = {
   id: string;
@@ -31,13 +32,21 @@ const FileExplorer = ({
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const handleBrowse = async () => {
-    // Try native dialog first
-    const selectedPath = await openNativeDirectoryDialog(label);
-    
-    if (selectedPath) {
-      // Use the native dialog selection
-      onChange(selectedPath);
-    } else {
+    try {
+      // Try native dialog first
+      const selectedPath = await openNativeDirectoryDialog(label);
+      
+      if (selectedPath) {
+        // Use the native dialog selection
+        onChange(selectedPath);
+        toast.success(`Selected folder: ${selectedPath}`);
+      } else {
+        // Fall back to our custom dialog
+        setIsDialogOpen(true);
+      }
+    } catch (error) {
+      console.error('Error browsing folder:', error);
+      toast.error(`Error browsing folder: ${(error as Error).message}`);
       // Fall back to our custom dialog
       setIsDialogOpen(true);
     }
@@ -115,7 +124,10 @@ const FileExplorer = ({
         <FolderBrowserDialog 
           isOpen={isDialogOpen}
           onOpenChange={setIsDialogOpen}
-          onSelectFolder={onChange}
+          onSelectFolder={(selectedPath) => {
+            onChange(selectedPath);
+            toast.success(`Selected folder: ${selectedPath}`);
+          }}
           label={label}
         />
       </Dialog>

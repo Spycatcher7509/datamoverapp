@@ -1,5 +1,6 @@
 
 import { environmentDetector } from '@/services/environmentDetector';
+import { toast } from 'sonner';
 
 interface FolderItem {
   name: string;
@@ -15,17 +16,23 @@ export const loadFolderContents = async (folderPath: string): Promise<FolderItem
   
   try {
     if (environmentDetector.isReady()) {
-      // Use Tauri FS API
+      // Ensure environment is initialized
+      await environmentDetector.waitForInit();
+      
       try {
         // Check if the path exists
         const exists = await environmentDetector.tauriFs.exists(folderPath);
         if (!exists) {
           console.error(`Path does not exist: ${folderPath}`);
-          return [];
+          throw new Error(`The folder "${folderPath}" does not exist or cannot be accessed`);
         }
 
+        console.log(`Reading directory: ${folderPath}`);
+        
         // Read the directory contents
         const entries = await environmentDetector.tauriFs.readDir(folderPath, { recursive: false });
+        
+        console.log(`Got ${entries?.length || 0} entries from: ${folderPath}`);
         
         // Convert entries to our format
         const formattedEntries = entries.map(entry => ({
@@ -45,9 +52,11 @@ export const loadFolderContents = async (folderPath: string): Promise<FolderItem
         return formattedEntries;
       } catch (error) {
         console.error('Error reading directory with Tauri:', error);
+        toast.error(`Error browsing folder: ${(error as Error).message}`);
         return generateMockFolderContents(folderPath);
       }
     } else {
+      console.log('Environment not ready, using mock data');
       // Mock for web environment
       return generateMockFolderContents(folderPath);
     }
@@ -112,12 +121,27 @@ export const generateMockFolderContents = (folderPath: string): FolderItem[] => 
 
 export const getPlatformRoot = async (): Promise<string> => {
   try {
+    // Ensure environment is initialized
+    await environmentDetector.waitForInit();
+    
     if (environmentDetector.isReady()) {
       // Get home directory when using Tauri
-      const homedir = await environmentDetector.tauriPath.homeDir();
-      return homedir;
+      try {
+        const homedir = await environmentDetector.tauriPath.homeDir();
+        console.log(`Got home directory: ${homedir}`);
+        return homedir;
+      } catch (error) {
+        console.error('Error getting home directory:', error);
+        // Fallback to basic root paths if error occurs
+        if (navigator.platform.toLowerCase().includes('win')) {
+          return 'C:\\';
+        } else {
+          return '/home/user';
+        }
+      }
     } else {
       // Mock for web environment
+      console.log('Using mock platform root in web environment');
       const platform = navigator.platform.toLowerCase();
       if (platform.includes('win')) {
         return 'C:\\';

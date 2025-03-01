@@ -4,6 +4,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import FolderItem from './FolderItem';
 import { useQuery } from '@tanstack/react-query';
 import { loadFolderContents } from './folderBrowserUtils';
+import { toast } from 'sonner';
 
 interface FolderItemData {
   name: string;
@@ -24,13 +25,19 @@ const FolderBrowserContent = ({
   const { 
     data: folderContents = [], 
     isLoading,
-    error 
+    error,
+    isError
   } = useQuery({
     queryKey: ['folderContents', currentPath],
     queryFn: () => loadFolderContents(currentPath),
     enabled: !!currentPath,
     staleTime: 5 * 60 * 1000, // 5 minutes
     refetchOnWindowFocus: false,
+    retry: 1, // Only retry once to avoid multiple error messages
+    onError: (error) => {
+      console.error('Error loading folder contents:', error);
+      toast.error(`Failed to load folder: ${(error as Error).message}`);
+    }
   });
 
   if (isLoading) {
@@ -43,12 +50,18 @@ const FolderBrowserContent = ({
     );
   }
 
-  if (error) {
+  if (isError) {
     return (
       <ScrollArea className="h-[250px]">
         <div className="p-4 text-center text-destructive">
           <p>Error loading folder contents</p>
           <p className="text-xs text-muted-foreground mt-1">{(error as Error).message}</p>
+          <button 
+            className="mt-2 text-xs text-primary hover:underline"
+            onClick={() => onSelectFolder(currentPath.substring(0, currentPath.lastIndexOf('/')))}
+          >
+            Go to parent folder
+          </button>
         </div>
       </ScrollArea>
     );
