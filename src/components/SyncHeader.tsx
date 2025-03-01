@@ -8,6 +8,9 @@ interface SyncHeaderProps {
 }
 
 const SyncHeader = ({ syncStatus }: SyncHeaderProps) => {
+  // Ensure we have a valid syncStatus with a default state
+  const safeStatus = syncStatus || { state: 'idle' };
+  
   return (
     <div className="flex items-center justify-between">
       <div className="flex items-center space-x-2">
@@ -18,9 +21,9 @@ const SyncHeader = ({ syncStatus }: SyncHeaderProps) => {
       </div>
       
       <SyncStatus 
-        state={syncStatus.state} 
-        message={syncStatus.message}
-        lastSync={syncStatus.lastSync} 
+        state={safeStatus.state} 
+        message={safeStatus.message}
+        lastSync={safeStatus.lastSync} 
       />
     </div>
   );

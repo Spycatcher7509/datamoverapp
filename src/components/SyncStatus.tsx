@@ -18,8 +18,11 @@ const SyncStatus = ({
   lastSync,
   className 
 }: SyncStatusProps) => {
+  // Ensure we have a valid state, defaulting to 'idle' if undefined
+  const safeState = state || 'idle';
+
   const getIcon = () => {
-    switch (state) {
+    switch (safeState) {
       case 'idle':
         return <Clock className="h-4 w-4" />;
       case 'polling':
@@ -40,7 +43,7 @@ const SyncStatus = ({
   };
 
   const getColorVariant = () => {
-    switch (state) {
+    switch (safeState) {
       case 'idle':
         return "bg-secondary text-secondary-foreground";
       case 'polling':
@@ -60,7 +63,7 @@ const SyncStatus = ({
   };
 
   const getDefaultMessage = () => {
-    switch (state) {
+    switch (safeState) {
       case 'idle':
         return "Ready to sync";
       case 'polling':
@@ -93,9 +96,9 @@ const SyncStatus = ({
         <span>{message || getDefaultMessage()}</span>
       </Badge>
       
-      {lastSync && state !== 'error' && (
+      {lastSync && safeState !== 'error' && (
         <p className="text-xs text-muted-foreground pl-1">
-          {state === 'idle' ? 'Last sync:' : 'Updated:'} {lastSync}
+          {safeState === 'idle' ? 'Last sync:' : 'Updated:'} {lastSync}
         </p>
       )}
     </div>

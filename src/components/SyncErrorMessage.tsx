@@ -6,10 +6,11 @@ import {
   DialogContent, 
   DialogHeader, 
   DialogTitle,
-  DialogFooter
+  DialogFooter,
+  DialogTrigger
 } from "@/components/ui/dialog";
 import { AlertCircleIcon, XCircleIcon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { SyncStatus } from "../services/types";
 
 interface SyncErrorMessageProps {
@@ -19,6 +20,13 @@ interface SyncErrorMessageProps {
 
 const SyncErrorMessage = ({ syncStatus, onClearError }: SyncErrorMessageProps) => {
   const [open, setOpen] = useState(false);
+  
+  // Reset dialog state when error is cleared
+  useEffect(() => {
+    if (syncStatus.state !== 'error') {
+      setOpen(false);
+    }
+  }, [syncStatus]);
   
   if (syncStatus.state !== 'error') {
     return null;
