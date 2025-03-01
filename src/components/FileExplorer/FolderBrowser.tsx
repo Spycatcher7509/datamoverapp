@@ -50,7 +50,7 @@ const FolderBrowser = ({
             <span className="text-xs truncate max-w-[200px]">{currentPath}</span>
           </div>
           
-          <ScrollArea className="h-[250px]">
+          <ScrollArea className="h-[350px]">
             <div className="space-y-1 p-1">
               {folderContents.map((item, index) => (
                 <FolderItem

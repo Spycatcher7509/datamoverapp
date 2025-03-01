@@ -1,161 +1,160 @@
+import { SyncConfig, SyncStatus, SyncResult } from './types';
+import { isTauri } from './environmentDetector';
+import { copyFiles, getFilesToSync, resetSyncedFiles } from './fileOperations';
 
-import { toast } from "sonner";
-import { SyncConfig, SyncStatus } from './types';
-import { fileOperations } from './fileOperations';
+// Polling interval ID for background sync
+let pollingIntervalId: NodeJS.Timeout | null = null;
 
-class FileSyncService {
-  timerId: number | null = null;
-  lastSyncTime: Date | null = null;
-  sourceFiles: string[] = [];
-  syncedFiles: Set<string> = new Set();
+// Keep track of the last sync time for polling logic
+let lastSyncTime = 0;
 
-  constructor() {
-    // Initialize is handled automatically 
-    // by the environment detector when imported
-  }
-
-  // Start the polling process
-  startPolling(config: SyncConfig, onStatusChange: (status: SyncStatus) => void) {
-    if (this.timerId) {
-      this.stopPolling();
+/**
+ * File sync service for managing file synchronization
+ */
+export const fileSyncService = {
+  /**
+   * Starts polling for file changes based on configuration
+   */
+  startPolling: (config: SyncConfig, statusCallback: (status: SyncStatus) => void) => {
+    // Clear any existing polling
+    if (pollingIntervalId) {
+      clearInterval(pollingIntervalId);
+      pollingIntervalId = null;
     }
-
+    
+    // If not enabled, don't start
     if (!config.enabled) {
-      onStatusChange({ state: 'idle' });
+      statusCallback({ state: 'idle' });
       return;
     }
-
-    // Validate configuration
-    if (!config.sourceFolder || !config.destinationFolder) {
-      onStatusChange({ 
-        state: 'error', 
-        error: 'Source and destination folders must be specified' 
-      });
-      return;
-    }
-
-    // Make sure source and destination are different
-    if (config.sourceFolder === config.destinationFolder) {
-      onStatusChange({ 
-        state: 'error', 
-        error: 'Source and destination folders must be different' 
-      });
-      return;
-    }
-
-    // Convert seconds to milliseconds
+    
+    lastSyncTime = Date.now();
+    statusCallback({ state: 'active', message: 'Monitoring for changes', lastSyncTime });
+    
+    // Set polling interval in seconds
     const intervalMs = config.pollingInterval * 1000;
-
-    // Initial status update
-    onStatusChange({ state: 'polling' });
-
-    // Perform immediate sync
-    this.performSync(config, onStatusChange);
-
-    // Set up polling interval
-    this.timerId = window.setInterval(() => {
-      this.performSync(config, onStatusChange);
-    }, intervalMs);
-  }
-
-  // Stop the polling process
-  stopPolling() {
-    if (this.timerId !== null) {
-      clearInterval(this.timerId);
-      this.timerId = null;
-    }
-  }
-
-  // Reset synced files tracking
-  resetSyncedFiles() {
-    this.syncedFiles.clear();
-  }
-
-  // Perform a single sync operation
-  async performSync(config: SyncConfig, onStatusChange: (status: SyncStatus) => void): Promise<void> {
-    // First update status to polling
-    onStatusChange({ state: 'polling' });
-
-    try {
-      // Validate source and destination
-      if (!config.sourceFolder || !config.destinationFolder) {
-        throw new Error('Source and destination folders must be specified');
-      }
-
-      // Get files from source directory
-      this.sourceFiles = await fileOperations.readFiles(config.sourceFolder);
-      
-      // Find files that need to be synced (not in syncedFiles)
-      const filesToSync = this.sourceFiles.filter(file => !this.syncedFiles.has(file));
-      
-      if (filesToSync.length > 0) {
-        // Update status to syncing
-        onStatusChange({ state: 'syncing' });
-        
-        // Sync each file
-        for (const file of filesToSync) {
-          await fileOperations.syncFile(file, config.destinationFolder);
-          // Mark as synced
-          this.syncedFiles.add(file);
+    
+    pollingIntervalId = setInterval(async () => {
+      try {
+        // Don't run sync if already syncing
+        if (statusCallback({ state: 'checking' })) {
+          // Check for files that need sync
+          const filesToSync = await getFilesToSync(config);
+          
+          // If files need syncing, sync them
+          if (filesToSync.length > 0) {
+            statusCallback({ 
+              state: 'syncing', 
+              message: `Syncing ${filesToSync.length} files...`,
+              filesCount: filesToSync.length 
+            });
+            
+            const result = await copyFiles(config, filesToSync);
+            
+            lastSyncTime = Date.now();
+            statusCallback({ 
+              state: 'active', 
+              message: `Synced ${result.syncedCount} files`, 
+              lastSyncTime,
+              lastSyncResult: result
+            });
+          } else {
+            // No files to sync - still active
+            statusCallback({ 
+              state: 'active', 
+              message: 'Monitoring for changes', 
+              lastSyncTime 
+            });
+          }
         }
-        
-        this.lastSyncTime = new Date();
-        // Format current time
-        const timeString = this.lastSyncTime.toLocaleTimeString();
-        
-        // Update status to success
-        onStatusChange({
-          state: 'success',
-          message: `Synced ${filesToSync.length} files`,
-          lastSync: timeString
+      } catch (error) {
+        // Handle sync errors
+        console.error('Sync error:', error);
+        statusCallback({ 
+          state: 'error', 
+          error: error instanceof Error ? error.message : 'Unknown error during sync'
         });
         
-        // Show toast notification
-        toast.success(`Synced ${filesToSync.length} files to destination`);
-      } else {
-        // No changes found, update status to idle
-        onStatusChange({
-          state: 'idle',
-          lastSync: this.lastSyncTime ? this.lastSyncTime.toLocaleTimeString() : undefined
-        });
+        // Stop polling on error
+        if (pollingIntervalId) {
+          clearInterval(pollingIntervalId);
+          pollingIntervalId = null;
+        }
       }
-    } catch (error) {
-      // Handle errors
-      console.error('Sync error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    }, intervalMs);
+  },
+  
+  /**
+   * Stops the polling/monitoring process
+   */
+  stopPolling: () => {
+    if (pollingIntervalId) {
+      clearInterval(pollingIntervalId);
+      pollingIntervalId = null;
+    }
+  },
+  
+  /**
+   * Manually triggers a sync operation
+   */
+  manualSync: async (config: SyncConfig, statusCallback: (status: SyncStatus) => void): Promise<SyncResult> => {
+    try {
+      // Update status to checking
+      statusCallback({ state: 'checking' });
       
-      onStatusChange({
-        state: 'error',
-        error: errorMessage
+      // Get files that need to be synced
+      const filesToSync = await getFilesToSync(config);
+      
+      // Update status based on files to sync
+      if (filesToSync.length === 0) {
+        lastSyncTime = Date.now();
+        statusCallback({ 
+          state: 'active', 
+          message: 'No files need syncing', 
+          lastSyncTime
+        });
+        return { syncedCount: 0, errorCount: 0, details: [] };
+      }
+      
+      // Update status to syncing
+      statusCallback({ 
+        state: 'syncing', 
+        message: `Syncing ${filesToSync.length} files...`,
+        filesCount: filesToSync.length 
       });
       
-      // Show error toast
-      toast.error(`Sync error: ${errorMessage}`);
+      // Perform the sync operation
+      const result = await copyFiles(config, filesToSync);
+      
+      // Update status to complete
+      lastSyncTime = Date.now();
+      statusCallback({ 
+        state: 'active', 
+        message: `Synced ${result.syncedCount} files`, 
+        lastSyncTime,
+        lastSyncResult: result
+      });
+      
+      return result;
+    } catch (error) {
+      // Handle and report errors
+      console.error('Manual sync error:', error);
+      statusCallback({ 
+        state: 'error', 
+        error: error instanceof Error ? error.message : 'Unknown error during manual sync'
+      });
+      throw error;
     }
+  },
+  
+  /**
+   * Reset sync state - useful for testing or forcing a full sync
+   */
+  resetSync: async () => {
+    await resetSyncedFiles();
+    lastSyncTime = 0;
   }
+};
 
-  // Manually trigger a sync
-  async manualSync(config: SyncConfig, onStatusChange: (status: SyncStatus) => void): Promise<void> {
-    // Clear previously synced files to force re-sync
-    this.resetSyncedFiles();
-    
-    // If a poll is already in progress, cancel it
-    if (this.timerId) {
-      this.stopPolling();
-    }
-    
-    // Perform a sync
-    await this.performSync(config, onStatusChange);
-    
-    // If enabled, restart polling
-    if (config.enabled) {
-      this.startPolling(config, onStatusChange);
-    }
-  }
-}
-
-// Create and export a singleton instance
-export const fileSyncService = new FileSyncService();
-
-// Re-export types from the types module for backward compatibility
-export { SyncConfig, SyncStatus } from './types';
+// Re-export types for convenience
+export type { SyncConfig, SyncStatus, SyncResult };
