@@ -1,30 +1,82 @@
+
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { AlertCircle } from 'lucide-react';
-import { SyncStatus as SyncStatusType } from '@/services/types';
+import { 
+  Dialog,
+  DialogTrigger, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle,
+  DialogFooter
+} from "@/components/ui/dialog";
+import { AlertCircleIcon, XCircleIcon } from "lucide-react";
+import { useState } from "react";
+import { SyncStatus } from "../services/types";
 
 interface SyncErrorMessageProps {
-  syncStatus: SyncStatusType;
+  syncStatus: SyncStatus;
   onClearError: () => void;
 }
 
 const SyncErrorMessage = ({ syncStatus, onClearError }: SyncErrorMessageProps) => {
-  if (syncStatus.state !== 'error') return null;
-
+  const [open, setOpen] = useState(false);
+  
+  if (syncStatus.state !== 'error') {
+    return null;
+  }
+  
   return (
-    <div className="mt-4 p-3 bg-destructive/10 text-destructive rounded-md flex items-start">
-      <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
-      <div>
-        <p className="font-medium text-sm">Sync Error</p>
-        <p className="text-xs mt-1">{syncStatus.error || "Unknown error occurred"}</p>
-        <Button 
-          variant="destructive" 
-          size="sm" 
-          className="mt-2 h-7 text-xs" 
-          onClick={onClearError}
-        >
-          Clear Error
-        </Button>
-      </div>
+    <div className="mt-6 animate-fade-in">
+      <Alert variant="destructive" className="border-destructive/50">
+        <AlertCircleIcon className="h-4 w-4" />
+        <AlertTitle>Sync Error</AlertTitle>
+        <AlertDescription className="flex items-start justify-between">
+          <div>
+            {syncStatus.error || "An error occurred during synchronization."}
+          </div>
+          
+          <div className="flex items-center space-x-2 ml-4 mt-1">
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger asChild>
+                <Button variant="ghost" className="h-6 px-2">
+                  <XCircleIcon className="h-4 w-4 mr-1" />
+                  <span>Dismiss</span>
+                </Button>
+              </DialogTrigger>
+              
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>
+                    Clear Sync Error
+                  </DialogTitle>
+                </DialogHeader>
+                
+                <div className="py-4">
+                  Are you sure you want to clear this error? This will reset the sync status.
+                </div>
+                
+                <DialogFooter>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    variant="destructive"
+                    onClick={() => {
+                      onClearError();
+                      setOpen(false);
+                    }}
+                  >
+                    Clear Error
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </AlertDescription>
+      </Alert>
     </div>
   );
 };
