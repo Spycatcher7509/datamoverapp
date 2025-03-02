@@ -47,26 +47,34 @@ class EnvironmentDetector {
         // Request storage permissions for Android
         if (this.isAndroid()) {
           try {
+            // Import the Permissions plugin properly
             const { Permissions } = await import('@capacitor/core');
-            // Request permissions
-            const permissionState = await Permissions.query({
-              name: 'storage'
-            });
             
-            if (permissionState.state !== 'granted') {
-              const requestResult = await Permissions.request({
+            // Request permissions using the imported plugin
+            try {
+              const permissionState = await Permissions.query({
                 name: 'storage'
               });
               
-              if (requestResult.state !== 'granted') {
-                toast.error('Storage permission is required for file operations');
-                console.warn('Storage permission denied');
-              } else {
-                console.log('Storage permission granted');
+              if (permissionState.state !== 'granted') {
+                const requestResult = await Permissions.request({
+                  name: 'storage'
+                });
+                
+                if (requestResult.state !== 'granted') {
+                  toast.error('Storage permission is required for file operations');
+                  console.warn('Storage permission denied');
+                } else {
+                  console.log('Storage permission granted');
+                }
               }
+            } catch (permErr) {
+              console.error('Error with Permissions API:', permErr);
+              toast.error('Failed to request storage permissions');
             }
           } catch (err) {
             console.error('Error requesting Android permissions:', err);
+            toast.error('Failed to load permissions module');
           }
         }
       } else {
