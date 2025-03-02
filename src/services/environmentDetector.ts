@@ -47,11 +47,12 @@ class EnvironmentDetector {
         // Request storage permissions for Android
         if (this.isAndroid()) {
           try {
-            // Import the Permissions plugin properly
+            // Import Capacitor properly and access the Permissions API correctly
+            const { Capacitor } = await import('@capacitor/core');
             const { Permissions } = await import('@capacitor/core');
             
-            // Request permissions using the imported plugin
             try {
+              // Request storage permission
               const permissionState = await Permissions.query({
                 name: 'storage'
               });
