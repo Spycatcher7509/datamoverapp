@@ -24,7 +24,6 @@ const FolderSelector: React.FC = () => {
 
   return (
     <div className="p-4 border rounded-md">
-      <Button onClick={handleSelectFolder} className="mb-2">Select Folder</Button>
       {folder && <p className="mt-2">Selected Folder: {folder}</p>}
     </div>
   );
