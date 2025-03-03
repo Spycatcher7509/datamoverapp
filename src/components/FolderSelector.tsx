@@ -10,7 +10,8 @@ const FolderSelector: React.FC = () => {
     try {
       const selectedFolder = await open({
         directory: true,
-        multiple: false
+        multiple: false,
+        defaultPath: "/Users/dassgehtdichnichtan/datamoverapp"
       });
       if (selectedFolder && typeof selectedFolder === 'string') {
         setFolder(selectedFolder);
