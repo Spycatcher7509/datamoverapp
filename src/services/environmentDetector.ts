@@ -44,46 +44,9 @@ class EnvironmentDetector {
         }
       } else if (this.isCapacitor) {
         console.log('Running in Capacitor (mobile) environment');
-        // Request storage permissions for Android
+        // Android storage permissions are handled per-operation by the Filesystem plugin
         if (this.isAndroid()) {
-          try {
-            // Import Capacitor properly
-            const { Capacitor } = await import('@capacitor/core');
-            
-            try {
-              // For Capacitor 4+, we need to import the specific plugin
-              const { Permissions } = await import('@capacitor/core');
-              
-              try {
-                // Request storage permission using the imported plugin
-                const permissionState = await Permissions.query({
-                  name: 'storage'
-                });
-                
-                if (permissionState.state !== 'granted') {
-                  const requestResult = await Permissions.request({
-                    name: 'storage'
-                  });
-                  
-                  if (requestResult.state !== 'granted') {
-                    toast.error('Storage permission is required for file operations');
-                    console.warn('Storage permission denied');
-                  } else {
-                    console.log('Storage permission granted');
-                  }
-                }
-              } catch (permErr) {
-                console.error('Error with Permissions API:', permErr);
-                toast.error('Failed to request storage permissions');
-              }
-            } catch (permImportErr) {
-              console.error('Error importing Permissions API:', permImportErr);
-              toast.error('Failed to load Permissions module');
-            }
-          } catch (err) {
-            console.error('Error requesting Android permissions:', err);
-            toast.error('Failed to load permissions module');
-          }
+          console.log('Running on Android, permissions will be requested as needed');
         }
       } else {
         console.log('Running in web environment');
